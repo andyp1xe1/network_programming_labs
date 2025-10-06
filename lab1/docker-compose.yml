@@ -7,12 +7,12 @@ services:
       - ./www:/app/www
     command: ["uv", "run", "server.py", "/app/www", "8080"]
     
-  # http-client:
-  #   build: .
-  #   ports:
-  #     - "8080:8080"
-  #   profiles:
-  #     - client
-  #   volumes:
-  #     - ./downloads:/app/downloads
-  #   command: ["uv", "run", "client.py", "localhost", "8080", "index.html"]
+  http-client:
+    build: .
+    ports:
+      - "8080:8080"
+    profiles:
+      - client
+    volumes:
+      - ./downloads:/app/downloads
+    command: ["uv", "run", "client.py", "localhost", "8080", "index.html"]
