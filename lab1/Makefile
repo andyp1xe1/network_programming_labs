@@ -7,7 +7,7 @@ help:
 	@echo "HTTP File Server - Available commands:"
 	@echo ""
 	@echo "  make server          - Start the HTTP server (docker-compose up)"
-	@echo "  make client FILE=<filename> - Run client to download file"
+	@echo "  make client FILE=<filename> [HOST=<address>] [PORT=<port>] - Run client to download file"
 	@echo "  make stop            - Stop the server"
 	@echo "  make build           - Build Docker images"
 	@echo "  make clean           - Stop and remove containers/images/downloads"
@@ -19,6 +19,8 @@ help:
 	@echo "Examples:"
 	@echo "  make server"
 	@echo "  make client FILE=index.html"
+	@echo "  make client FILE=index.html HOST=192.168.1.100"
+	@echo "  make client FILE=index.html HOST=192.168.1.100 PORT=9000"
 
 # Start the HTTP server
 server:
@@ -29,12 +31,15 @@ server:
 client:
 	@if [ -z "$(FILE)" ]; then \
 		echo "Error: Please specify FILE parameter"; \
-		echo "Usage: make client FILE=<filename>"; \
+		echo "Usage: make client FILE=<filename> [HOST=<address>] [PORT=<port>]"; \
 		echo "Example: make client FILE=index.html"; \
+		echo "Example: make client FILE=index.html HOST=192.168.1.100"; \
 		exit 1; \
 	fi
-	@echo "Downloading: $(FILE)"
-	docker-compose run --rm http-client uv run client.py http-server 8080 $(FILE)
+	$(eval HOST := $(if $(HOST),$(HOST),localhost))
+	$(eval PORT := $(if $(PORT),$(PORT),8080))
+	@echo "Downloading: $(FILE) from $(HOST):$(PORT)"
+	docker-compose run --rm http-client uv run client.py $(HOST) $(PORT) $(FILE)
 
 # Stop the server
 stop:

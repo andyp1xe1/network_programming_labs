@@ -6,6 +6,7 @@ services:
     volumes:
       - ./www:/app/www
     command: ["uv", "run", "server.py", "/app/www", "8080"]
+    network_mode: "host"
     
   http-client:
     build: .
@@ -13,6 +14,5 @@ services:
       - client
     volumes:
       - ./downloads:/app/downloads
-    command: ["uv", "run", "client.py", "http-server", "8080", "index.html"]
-    depends_on:
-      - http-server
+    command: ["uv", "run", "client.py", "localhost", "8080", "index.html"]
+    network_mode: "host"
