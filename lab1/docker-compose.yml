@@ -1,0 +1,18 @@
+services:
+  http-server:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./www:/app/www
+    command: ["uv", "run", "server.py", "/app/www", "8080"]
+    
+  http-client:
+    build: .
+    profiles:
+      - client
+    volumes:
+      - ./downloads:/app/downloads
+    command: ["uv", "run", "client.py", "http-server", "8080", "index.html"]
+    depends_on:
+      - http-server
