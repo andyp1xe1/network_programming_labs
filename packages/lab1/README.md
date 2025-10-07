@@ -2,8 +2,6 @@
 
 HTTP file server using Python TCP sockets with directory listing and file download capabilities.
 
-## Lab Requirements Report
-
 ### 1. Source Directory Contents
 
 ```
