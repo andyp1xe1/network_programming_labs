@@ -2,105 +2,87 @@
 
 HTTP file server using Python TCP sockets with directory listing and file download capabilities.
 
-## Usage
-
-```bash
-# Start server
-make server
-
-# Run tests  
-make test
-
-# Download files from local server
-make client FILE=index.html
-
-# Connect to remote server on local network
-make client FILE=index.html HOST=192.168.1.100
-```
-
-## Requirements Fulfilled
-
-- HTTP file server using TCP sockets
-- Serves HTML, PNG, PDF files
-- 404 error handling for missing files
-- Takes directory as command-line argument
-- Docker Compose integration
-- HTTP client implementation (2 points)
-- Directory listing with hyperlinks (2 points)
-- Network browsing capability (1 point)
-
-## Lab Report
+## Lab Requirements Report
 
 ### 1. Source Directory Contents
 
-[Screenshot: Project structure showing src/lab1/, www/, docker-compose.yml, Makefile]
+```
+src/
+└── lab1/
+    ├── __init__.py
+    ├── client.py
+    └── server.py
+```
 
-The project contains server.py, client.py implementations with Docker configuration and content directory.
+The source directory contains the HTTP server and client implementations.
 
-### 2. Docker Compose File
+### 2. Docker Configuration
 
-[Screenshot: docker-compose.yml contents]
+```yaml
+# docker-compose.yml and Dockerfile
+```
 
-Docker configuration defines HTTP server and client services with volume mounts and port exposure.
+Docker compose file defines the HTTP server service with volume mounts and port exposure. Dockerfile uses uv cache mounts to speed up dependency installation.
 
 ### 3. Starting the Container
 
-[Screenshot: Terminal output of `make server` command]
+![Starting Container](./img/make_dev.png)
 
-Container starts in background mode with HTTP server service.
+Container starts in watch mode with HTTP server service.
 
-### 4. Server Command
+### 5. Using uv
 
-[Screenshot: Server running with directory argument]
+```bash
+uv run server www/ 8080
+uv run client 0.0.0.0 8080 index.html
+```
 
-Server executes: `uv run ./packages/lab1/src/lab1/server.py ./packages/lab1/www`
+Both server and client can be run by uv directly
 
-### 5. Served Directory Contents
+### 6. Served Directory Contents
 
-[Screenshot: Contents of www/ directory]
+```
+www/
+├── index.html
+├── sample.png
+├── document1.pdf
+├── document2.pdf
+└── subdir/
+    ├── index.html
+    ├── nested_image.png
+    └── nested_document.pdf
+```
 
-Directory contains index.html with embedded image, PNG file, PDF files, and subdirectory.
+The www directory contains HTML files, images, and PDFs for serving.
 
-### 6. Browser Requests
+### 7. Browser Requests
 
-[Screenshot: 404 error page for nonexistent.html]
+![404 Error](./img/nonexistent_web.png)
 
-404 error handling for missing files.
+404 error page for non-existent files.
 
-[Screenshot: HTML file with embedded image displayed in browser]
+![HTML with Image](./img/embeded_web.png)
 
-HTML file serving with PNG image reference.
+HTML file with embedded image displayed in browser.
 
-[Screenshot: PDF file download in browser]
+![PDF File](./img/pdf_web.png)
 
 PDF file serving and download functionality.
 
-[Screenshot: PNG file displayed in browser]
+![PNG Image](./img/image_web.png)
 
-PNG image file serving.
+PNG image file serving and display.
 
-### 7. Client Usage
+### 8. Client Implementation
 
-[Screenshot: Client downloading HTML file with terminal output]
+The client downloads files and displays output with saved files handling.
 
-Client prints HTML content to terminal.
+### 9. Directory Listing
 
-[Screenshot: Client downloading PDF file and saved files in downloads/]
+![Root Directory](./img/web_listing_root.png)
 
-Client saves binary files to downloads directory.
+Directory listing page for root directory.
 
-### 8. Directory Listing
+![Subdirectory](./img/web_listing_subdir.png)
 
-[Screenshot: Generated directory listing page for subdir/]
-
-Server generates HTML directory listing with hyperlinks for subdirectory browsing.
-
-### 9. Network Testing
-
-[Screenshot: Network setup showing IP configuration]
-
-Local network setup for testing with friends' servers.
-
-[Screenshot: Client connecting to remote server]
-
-Successful connection to friend's server using IP address and file download.
+Directory listing page for subdirectory navigation.

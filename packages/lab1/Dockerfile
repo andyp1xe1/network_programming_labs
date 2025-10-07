@@ -17,4 +17,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked
 
 EXPOSE 8080
-CMD ["uv", "run", "./packages/lab1/src/lab1/server.py", "/app/www", "8080"]
+CMD ["uv", "run", "./packages/lab1/src/lab1/server.py", "./packages/lab1/src/lab1/www", "8080"]
