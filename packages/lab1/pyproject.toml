@@ -1,10 +1,10 @@
 [project]
 name = "lab1"
 version = "0.1.0"
-description = "Add your description here"
+description = "HTTP file server using Python TCP sockets with directory listing and file download capabilities"
 readme = "README.md"
 authors = [
-    { name = "Andre Chicu", email = "andriesh.chicu@gmail.com" }
+    { name = "Andrei Chicu", email = "andrei.chicu@isa.utm.md" }
 ]
 requires-python = ">=3.13"
 dependencies = []
