@@ -31,7 +31,7 @@ services:
     profiles:
       - client
     volumes:
-      - ./downloads:/workspace/packages/lab1/downloads
+      - ./downloads:/workspace/downloads
     command: ["uv", "run", "./packages/lab1/src/lab1/client.py", "0.0.0.0", "8080", "index.html"]
     depends_on:
       - http-server
