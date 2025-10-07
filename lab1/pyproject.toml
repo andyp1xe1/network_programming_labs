@@ -1,7 +1,0 @@
-[project]
-name = "lab1"
-version = "0.1.0"
-description = "Lab 1 for the Network Programming course"
-readme = "README.md"
-requires-python = ">=3.13"
-dependencies = []

@@ -1,0 +1,3 @@
+.ruff_cache/
+downloads/
+./**/__pycache__/

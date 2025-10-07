@@ -1,0 +1,37 @@
+services:
+  http-server:
+    build:
+      context: ../..
+      dockerfile: packages/lab1/Dockerfile
+    develop:
+      # Create a `watch` configuration to update the app
+      watch:
+        - action: sync
+          path: .
+          target: /workspace
+          # Exclude the project virtual environment
+          ignore:
+            - .venv/
+
+        # Rebuild the image on changes to the `pyproject.toml`
+        - action: rebuild
+          path: ./pyproject.toml
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./www:/workspace/packages/lab1/www
+    command: ["uv", "run", "./packages/lab1/src/lab1/server.py", "/workspace/packages/lab1/www", "8080"]
+    
+  http-client:
+    build:
+      context: ../..
+      dockerfile: packages/lab1/Dockerfile
+    ports:
+      - "8080:8080"
+    profiles:
+      - client
+    volumes:
+      - ./downloads:/workspace/packages/lab1/downloads
+    command: ["uv", "run", "./packages/lab1/src/lab1/client.py", "0.0.0.0", "8080", "index.html"]
+    depends_on:
+      - http-server

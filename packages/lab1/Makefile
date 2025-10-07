@@ -6,6 +6,7 @@
 help:
 	@echo "HTTP File Server - Available commands:"
 	@echo ""
+	@echo "  make dev             - Start development mode via docker-compose watch"
 	@echo "  make server          - Start the HTTP server (docker-compose up)"
 	@echo "  make client FILE=<filename> [HOST=<address>] [PORT=<port>] - Run client to download file"
 	@echo "  make stop            - Stop the server"
@@ -22,6 +23,10 @@ help:
 	@echo "  make client FILE=index.html HOST=192.168.1.100"
 	@echo "  make client FILE=index.html HOST=192.168.1.100 PORT=9000"
 
+dev:
+	@echo "Watching for changes..."
+	docker-compose watch
+
 # Start the HTTP server
 server:
 	@echo "Starting HTTP file server..."
@@ -36,10 +41,11 @@ client:
 		echo "Example: make client FILE=index.html HOST=192.168.1.100"; \
 		exit 1; \
 	fi
-	$(eval HOST := $(if $(HOST),$(HOST),localhost))
+	$(eval HOST := $(if $(HOST),$(HOST),http-server))
 	$(eval PORT := $(if $(PORT),$(PORT),8080))
 	@echo "Downloading: $(FILE) from $(HOST):$(PORT)"
-	docker-compose run --rm http-client uv run client.py $(HOST) $(PORT) $(FILE)
+	docker-compose run --rm http-client \
+		uv run ./packages/lab1/src/lab1/client.py $(HOST) $(PORT) $(FILE)
 
 # Stop the server
 stop:
