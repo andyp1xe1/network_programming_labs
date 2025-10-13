@@ -59,7 +59,7 @@ The www directory contains HTML files, images, and PDFs for serving.
 
 404 error page for non-existent files.
 
-![HTML with Image](./img/embeded_web.png)
+![HTML with Image](./img/embeded_web.jpg)
 
 HTML file with embedded image displayed in browser.
 
