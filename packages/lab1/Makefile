@@ -38,10 +38,10 @@ test: clean server
 	@make client FILE=index.html
 	@echo ""
 	@echo "Test 2: Download PDF file"
-	@make client FILE=document1.pdf
+	@make client FILE=assets/1962-calhoun.pdf
 	@echo ""
-	@echo "Test 3: Browse directory"
-	@make client FILE=subdir/
+	@echo "Test 3: Browse assets directory"
+	@make client FILE=assets/
 	@echo ""
 	@echo "Test 4: Test 404 error"
 	@make client FILE=nonexistent.html || true
