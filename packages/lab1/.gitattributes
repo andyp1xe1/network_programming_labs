@@ -1,0 +1,5 @@
+# Binary assets - treat as binary files
+www/assets/*.pdf binary
+www/assets/*.png binary
+www/assets/*.jpg binary
+www/assets/*.gif binary

@@ -80,7 +80,7 @@ class HTTPServer:
             return
 
         file_ext = os.path.splitext(full_path)[1].lower()
-        if file_ext not in [".html", ".htm", ".png", ".pdf"]:
+        if file_ext not in [".html", ".htm", ".png", ".pdf", ".css", ".gif", ".jpg", ".jpeg"]:
             self.write_response(client_socket, 404, "Not Found")
             return
 
@@ -143,40 +143,49 @@ class HTTPServer:
                 ".htm": "text/html",
                 ".png": "image/png",
                 ".pdf": "application/pdf",
+                ".css": "text/css",
+                ".gif": "image/gif",
+                ".jpg": "image/jpeg",
+                ".jpeg": "image/jpeg",
             }
             content_type = content_type_map.get(file_ext, "application/octet-stream")
         return content_type
 
     def generate_error_page(self, code, message):
         return f"""<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{code} {message}</title>
+    <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-    <h1>{code} {message}</h1>
-    <p>The requested resource could not be found or accessed.</p>
+    <div class="error-container">
+        <div class="error-logo">moss is sentient btw</div>
+        <h1>{code} {message}</h1>
+        <p>The requested resource could not be found or accessed.</p>
+    </div>
 </body>
 </html>"""
 
     def generate_directory_listing(self, relative_path, files, full_path):
         html_content = f"""<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Directory listing for /{relative_path}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 40px; }}
-        h1 {{ color: #333; }}
-        ul {{ list-style-type: none; padding: 0; }}
-        li {{ margin: 5px 0; }}
-        a {{ text-decoration: none; color: #0066cc; }}
-        a:hover {{ text-decoration: underline; }}
-        .dir {{ font-weight: bold; }}
-    </style>
+    <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-    <h1>Directory listing for /{relative_path}</h1>
-    <ul>
+    <div class="container">
+        <div class="header">
+            <div class="logo">moss is sentient btw</div>
+            <h1>/{relative_path}</h1>
+        </div>
+        <div class="listing">
+            <ul>
 """
 
         if relative_path:
@@ -196,7 +205,7 @@ class HTTPServer:
             else:
                 html_content += f'<li><a href="{url_path}">{filename}</a></li>\n'
 
-        html_content += "</ul></body></html>"
+        html_content += "</ul></div></div></body></html>"
         return html_content
 
 

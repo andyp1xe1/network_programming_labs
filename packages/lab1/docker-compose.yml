@@ -31,7 +31,9 @@ services:
     profiles:
       - client
     volumes:
-      - ./downloads:/workspace/downloads
-    command: ["uv", "run", "./packages/lab1/src/lab1/client.py", "0.0.0.0", "8080", "index.html"]
+      - ${DOWNLOAD_DIR:-./downloads}:/workspace/downloads
+    command: ["uv", "run", "./packages/lab1/src/lab1/client.py", "${SERVER_HOST:-http-server}", "${SERVER_PORT:-8080}", "${URL_PATH:-index.html}", "/workspace/downloads"]
+    environment:
+      - DOWNLOAD_DIR=${DOWNLOAD_DIR:-/workspace/downloads}
     depends_on:
       - http-server

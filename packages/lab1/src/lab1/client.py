@@ -168,9 +168,10 @@ class HTTPClient:
 
 
 def main():
-    if len(sys.argv) != 4:
-        print("Usage: uv run client.py <server_host> <server_port> <filename>")
+    if len(sys.argv) < 4 or len(sys.argv) > 5:
+        print("Usage: uv run client.py <server_host> <server_port> <url_path> [directory]")
         print("Example: uv run client.py localhost 8080 index.html")
+        print("Example: uv run client.py localhost 8080 index.html /custom/downloads")
         sys.exit(1)
 
     host = sys.argv[1]
@@ -181,10 +182,16 @@ def main():
         print("Error: Port must be a number")
         sys.exit(1)
 
-    filename = sys.argv[3]
+    url_path = sys.argv[3]
+    
+    # Use command line directory argument, fallback to environment variable, then default
+    if len(sys.argv) == 5:
+        download_dir = sys.argv[4]
+    else:
+        download_dir = os.environ.get('DOWNLOAD_DIR', 'downloads')
 
-    client = HTTPClient(host, port)
-    client.request(filename)
+    client = HTTPClient(host, port, download_dir)
+    client.request(url_path)
 
 
 if __name__ == "__main__":

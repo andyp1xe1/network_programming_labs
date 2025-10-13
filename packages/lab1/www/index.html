@@ -3,63 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to My File Server</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        .content {
-            text-align: center;
-            margin: 20px 0;
-        }
-        img {
-            max-width: 300px;
-            height: auto;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-        }
-        .links {
-            margin: 20px 0;
-        }
-        a {
-            display: inline-block;
-            margin: 10px;
-            padding: 10px 20px;
-            background: #007bff;
-            color: white;
-            text-decoration: none;
-            border-radius: 5px;
-        }
-        a:hover {
-            background: #0056b3;
-        }
-    </style>
+    <title>moss is sentient btw</title>
+    <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-    <h1>Welcome to My HTTP File Server</h1>
-    
-    <div class="content">
-        <p>This is a simple HTTP file server implemented with Python TCP sockets.</p>
+    <div class="container">
+        <header class="header">
+            <h1 class="logo">moss is sentient btw</h1>
+            <p class="subtitle">personal collection</p>
+        </header>
         
-        <h2>Sample Image</h2>
-        <img src="sample.png" alt="Sample Image">
+        <section class="section">
+            <h2>music</h2>
+            <p>nujabes and the art of japanese hip-hop</p>
+            <div class="featured-image">
+                <img src="/assets/nujabes.png" alt="nujabes" style="max-width: 200px;">
+            </div>
+            <div class="quote">
+                <div class="quote-text">
+                    see every song has a sequel<br>
+                    never same everything but the name
+                </div>
+                <div class="quote-author">— shing02</div>
+            </div>
+        </section>
         
-        <div class="links">
-            <h2>Available Files</h2>
-            <a href="document1.pdf">Document 1 (PDF)</a>
-            <a href="document2.pdf">Document 2 (PDF)</a>
-            <a href="subdir/">Browse Subdirectory</a>
-        </div>
+        <section class="section">
+            <h2>anime</h2>
+            <p>samurai champloo - where edo period meets hip-hop culture in perfect harmony</p>
+            <div class="featured-image">
+                <img src="/assets/samurai_champloo.gif" alt="samurai champloo" style="max-width: 400px;">
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>photos</h2>
+            <p>random captures and moments</p>
+            <div class="gallery">
+                <div class="gallery-item">
+                    <img src="/assets/photo_2_2025-10-13_20-06-35.jpg" alt="photo 2">
+                </div>
+                <div class="gallery-item">
+                    <img src="/assets/photo_3_2025-10-13_20-06-35.jpg" alt="photo 3">
+                </div>
+                <div class="gallery-item">
+                    <img src="/assets/photo_4_2025-10-13_20-06-35.jpg" alt="photo 4">
+                </div>
+                <div class="gallery-item">
+                    <img src="/assets/photo_5_2025-10-13_20-06-35.jpg" alt="photo 5">
+                </div>
+                <div class="gallery-item">
+                    <img src="/assets/photo_6_2025-10-13_20-06-35.jpg" alt="photo 6">
+                </div>
+                <div class="gallery-item">
+                    <img src="/assets/photo_7_2025-10-13_20-06-35.jpg" alt="photo 7">
+                </div>
+                <div class="gallery-item">
+                    <img src="/assets/photo_8_2025-10-13_20-06-35.jpg" alt="photo 8">
+                </div>
+                <div class="gallery-item">
+                    <img src="/assets/photo_9_2025-10-13_20-06-35.jpg" alt="photo 9">
+                </div>
+                <div class="gallery-item">
+                    <img src="/assets/photo_2025-10-13_21-02-34.jpg" alt="photo 9">
+                </div>
+            </div>
+        </section>
         
-        <p>You can navigate through directories and download files!</p>
+        <section class="section">
+            <h2>documents</h2>
+            <p>papers and resources</p>
+            <div class="links">
+                <a href="/assets/zipclasspaper.pdf" class="link">zip based text classifier paper</a>
+            </div>
+            <div class="links">
+                <a href="/assets/1962-calhoun.pdf" class="link">population density experiment</a>
+            </div>
+            <div class="links">
+                <a href="/assets/descrierea-moldovei.pdf" class="link">descrierea moldovei</a>
+            </div>
+        </section>
     </div>
 </body>
 </html>

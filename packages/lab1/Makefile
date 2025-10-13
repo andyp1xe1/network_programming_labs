@@ -11,8 +11,10 @@ server:
 client:
 	$(eval HOST := $(if $(HOST),$(HOST),http-server))
 	$(eval PORT := $(if $(PORT),$(PORT),8080))
-	docker-compose --profile client run --rm http-client \
-		uv run ./packages/lab1/src/lab1/client.py $(HOST) $(PORT) $(FILE)
+	$(eval FILE := $(if $(FILE),$(FILE),index.html))
+	$(eval DIR := $(if $(DIR),$(DIR),./downloads))
+	SERVER_HOST=$(HOST) SERVER_PORT=$(PORT) URL_PATH=$(FILE) DOWNLOAD_DIR=$(DIR) \
+	docker-compose --profile client run --rm http-client
 
 # Stop the server
 stop:
