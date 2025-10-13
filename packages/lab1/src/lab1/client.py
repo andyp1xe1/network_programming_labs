@@ -26,7 +26,9 @@ class HTTPClient:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
             client_socket.connect((self.host, self.port))
 
-            request = f"GET /{filename} HTTP/1.1\r\n"
+            # Ensure path starts with / but avoid double slashes
+            path = filename if filename.startswith('/') else f'/{filename}'
+            request = f"GET {path} HTTP/1.1\r\n"
             request += f"Host: {self.host}:{self.port}\r\n"
             request += "Connection: close\r\n\r\n"
 

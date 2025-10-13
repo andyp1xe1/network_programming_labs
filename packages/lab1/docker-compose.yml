@@ -16,8 +16,7 @@ services:
         # Rebuild the image on changes to the `pyproject.toml`
         - action: rebuild
           path: ./pyproject.toml
-    ports:
-      - "8080:8080"
+    network_mode: host
     volumes:
       - ./www:/workspace/packages/lab1/www
     command: ["uv", "run", "./packages/lab1/src/lab1/server.py", "/workspace/packages/lab1/www", "8080"]
@@ -26,13 +25,12 @@ services:
     build:
       context: ../..
       dockerfile: packages/lab1/Dockerfile
-    ports:
-      - "8080:8080"
+    network_mode: host
     profiles:
       - client
     volumes:
       - ${DOWNLOAD_DIR:-./downloads}:/workspace/downloads
-    command: ["uv", "run", "./packages/lab1/src/lab1/client.py", "${SERVER_HOST:-http-server}", "${SERVER_PORT:-8080}", "${URL_PATH:-index.html}", "/workspace/downloads"]
+    command: ["uv", "run", "./packages/lab1/src/lab1/client.py", "${SERVER_HOST:-localhost}", "${SERVER_PORT:-8080}", "${URL_PATH:-index.html}", "/workspace/downloads"]
     environment:
       - DOWNLOAD_DIR=${DOWNLOAD_DIR:-/workspace/downloads}
     depends_on:

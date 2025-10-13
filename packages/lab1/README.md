@@ -47,8 +47,7 @@ services:
     build:
       context: ../..
       dockerfile: packages/lab1/Dockerfile
-    ports:
-      - "8080:8080"
+    network_mode: host
     volumes:
       - ./www:/workspace/packages/lab1/www
     command: ["uv", "run", "./packages/lab1/src/lab1/server.py", "/workspace/packages/lab1/www", "8080"]
@@ -57,14 +56,20 @@ services:
     build:
       context: ../..
       dockerfile: packages/lab1/Dockerfile
+    network_mode: host
     profiles:
       - client
     volumes:
       - ${DOWNLOAD_DIR:-./downloads}:/workspace/downloads
-    command: ["uv", "run", "./packages/lab1/src/lab1/client.py", "${SERVER_HOST:-http-server}", "${SERVER_PORT:-8080}", "${URL_PATH:-index.html}", "/workspace/downloads"]
+    command: ["uv", "run", "./packages/lab1/src/lab1/client.py", "${SERVER_HOST:-localhost}", "${SERVER_PORT:-8080}", "${URL_PATH:-index.html}", "/workspace/downloads"]
     depends_on:
       - http-server
 ```
+
+**Network Configuration:**
+- **Host Networking** - Both services use `network_mode: host` for direct access to host network interfaces
+- **No Port Mapping** - Services bind directly to host ports without Docker port forwarding
+- **Cross-Network Access** - Enables connections to other machines on the local network (e.g., friend's servers)
 
 ## Starting the Container
 
@@ -196,6 +201,30 @@ The test suite (`make test`) verifies:
 2. PDF file download and saving
 3. Directory browsing functionality  
 4. 404 error handling for non-existent files
+
+## Connecting to a Friend
+
+To test network communication between different machines, I connected to my friend Maxim's HTTP server. Both machines needed to be on the same network.
+
+- **Maxim's IP address**: `192.168.1.16` (obtained via `ifconfig`)
+- **Port**: `1337`
+- **Test file**: `downloads/andrei.png`
+
+#### Client Connection to Friend's Server
+
+![Client HTML Request](./img/client_friend_html.png)
+
+Successfully fetched HTML content from Maxim's server using the Python client.
+
+![Client File Download](./img/client_friend_download.png)
+
+Downloaded a binary file (image) from Maxim's server, demonstrating binary file transfer capabilities.
+
+#### Browser Connection to Friend's Server
+
+![Browser Download](./img/browser_friend_download.png)
+
+Connected to Maxim's server via web browser, showing cross-platform compatibility and proper HTTP protocol implementation.
 
 ## Implementation Details
 
