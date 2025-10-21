@@ -1,0 +1,20 @@
+services:
+  concurrent-server:
+    build:
+      context: ../..
+      dockerfile: packages/lab2/Dockerfile
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /workspace
+          ignore:
+            - .venv/
+        - action: rebuild
+          path: ./pyproject.toml
+    network_mode: host
+    env_file:
+      - .env
+    volumes:
+      - ../www:/workspace/packages/www
+    command: ["uv", "run", "./packages/lab2/src/lab2/server.py"]
