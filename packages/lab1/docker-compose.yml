@@ -17,9 +17,11 @@ services:
         - action: rebuild
           path: ./pyproject.toml
     network_mode: host
+    env_file:
+      - .env
     volumes:
-      - ./www:/workspace/packages/lab1/www
-    command: ["uv", "run", "./packages/lab1/src/lab1/server.py", "/workspace/packages/lab1/www", "8080"]
+      - ../www:/workspace/packages/www
+    command: ["uv", "run", "./packages/lab1/src/lab1/server.py"]
     
   http-client:
     build:

@@ -185,7 +185,7 @@ def main():
         sys.exit(1)
 
     url_path = sys.argv[3]
-    
+
     # Use command line directory argument, fallback to environment variable, then default
     if len(sys.argv) == 5:
         download_dir = sys.argv[4]

@@ -2,7 +2,6 @@ UTM Network Programming course for FAF-23
 (Autumn 2025)
 Books
 I recommend reading “Computer Networking: a Top Down Approach”, skipping chapter 1. In chapter 2 you will learn everything you need for lab 1. You can find a copy in this folder.
-When learning about concurrency, beware that there are many conflicting definitions floating around, some of which are misleading and might cause you unnecessary suffering. I recommend adopting the definitions from this glossary and this paper. This article from an MIT course is a good introduction to the topic.
 Calendar
 
 
@@ -40,12 +39,17 @@ You must use Docker Compose
 You must use Python
 How to present
 Upload your project to GitHub and send me the URL in an email with the subject “PR lab 1” (artiom.balan@isa.utm.md). If you will be presenting later than the deadline, include the last commit hash so I can verify the time of the commit.
-Update: Include a short report in the repository (markdown or a link to a Google doc). The report will be like a demo but with screenshots, so just include screenshots of everything you would need to show in the demo: the commands you run, the outputs you see (browser, terminal) and write short descriptions where necessary.
-You will present to me during seminars, defend your code, and answer a few theoretical questions. Update: It is your responsibility to make sure you present in time before midterms. I will give priority to those who sent me an email first.
+Include a short report in the repository (markdown or a link to a Google doc). The report will be like a demo but with screenshots, so just include screenshots of everything you would need to show in the demo, each described with a short sentence: the commands you run, the outputs you see (browser, terminal). The report should prove that you satisfied all the requirements of the lab.
+You will present to me during seminars, defend your code, and answer a few theoretical questions. I will give priority to those who sent me an email first.
 Docker
 You must use Docker Compose for all your laboratory works so that I can run them on my computer.
 The official Docker 101 tutorial is a good resource.
 Lab 1: HTTP file server with TCP sockets
+The questions will be based on these resources:
+Chapter 2 from “Computer Networking 8th edition” (you can skip 2.3-2.6)
+This Python HOWTO article 
+(Optional) MIT class reading on Sockets & Networking
+You can practice on the questions from the end of the chapter.
 You will develop a simple HTTP file server like Python’s http.server. You will use it to build a website that lets your friends browse your collection of PDFs, like this one:
 
 It will handle one HTTP request at a time. The server program should take the directory  to be served as a command-line argument.
@@ -65,7 +69,7 @@ Browse the books on your friend’s server (local network), have fun - 1 point
 You can use your client to download a book from your friend’s server right into your own website directory.
 What the directory listing can look like (python’s http.server response shown here):
 
-The contents of the report should show that you satisfied all the requirements of the lab. All I need is screenshots, each described with a short sentence. For this lab, it should go like this:
+Report contents:
 The contents of your source directory
 The docker compose file (and Dockerfile if you use one)
 show how you start the container
@@ -76,14 +80,36 @@ Requests of 4 files in the browser: inexistent file (404), HTML file with image,
 (If you made directory listing) The directory listing generated page, subdirectory
 (If you browsed your friend’s server) Describe your network setup, how you found their IP, screenshots of the contents of their server, screenshots of requests to their server (using your own client if you implemented it)
 Lab 2: Concurrent HTTP server
-Work in progress
-Make your server from lab 1 accept multiple connections at a time. Add a delay to the request handler to simulate work.
-There are two ways to test it (can they use either?):
-Using their own http client
-Using a requests lib
-Should they use thread pools or async/await? Or maybe they can pick either?
-Additional exercises (optional, for better grade):
-Query your friend’s concurrent server, either with other people at the same time, or by making multiple concurrent requests (or better both). Compare the response time to the single-threaded server.
+The questions will be based on:
+A good introduction to concurrency: https://web.mit.edu/6.102/www/sp25/classes/14-concurrency/
+Section 4.3 from this article
+The definitions from this glossary
+(Optional)  The Art of Multiprocessor Programming (you can find a copy in the Drive)
+A bit of theory
+When learning about concurrency, beware that there are many conflicting definitions, examples and analogies floating around, some of which are misleading and might cause you unnecessary suffering. I recommend starting with the resources linked above.
+Note that high-level programmers define concurrency differently from low-level programmers. Therefore, there are two “correct” definitions of concurrency:
+In the OS (low-level) tradition:
+Concurrency = tasks overlap in time (including by interleaving)
+Parallelism = tasks run simultaneously (on multiple processors)
+Parallel implies Concurrent
+All parallel tasks are also concurrent
+Not all concurrent tasks are parallel
+In the PLT (high-level) tradition:
+Concurrency is a language concept: constructing a program as independent parts
+Parallelism is a hardware concept: executing computations on multiple processors simultaneously
+Parallelism and Concurrency are orthogonal
+A concurrent program may or may not execute in parallel
+A parallel computation may or may not have the notion of concurrency in its structure.
+As a consequence, the answer to “does parallel imply concurrent?” depends on the school of thought. As you will see, all the linked resources abide by the second school of thought. In general, the high-level view of concurrency is becoming more predominant, so it is important that you are aware of it and prove your understanding when answering the questions.
+To make it clear, if your answer is along the lines of “concurrency is a more general form of parallelism” or “concurrency is when tasks seemingly execute at the same time”, I will consider your answer wrong. You must at least mention the second definition.
+The task
+In this lab, you will make your HTTP server multithreaded, so that it can handle multiple connections concurrently. You can either create a thread per request, or use a thread pool.
+To test it, write a script that makes multiple concurrent requests to your server. Add a delay to the request handler to simulate work (~1s), make 10 concurrent requests and measure the amount of time in which they are handled. Do the same with the single-threaded server from the previous lab. Compare the two.
+Counter: 2 points
+Add a counter feature. Record the number of requests made to each file and show it in the directory listing. For example:
+First, implement it in a naive way and show that there is a race condition (you can rewrite the code and add delays to force interlacing of threads). Then, use a synchronization mechanism (e.g. a lock) and show that the race condition is gone.
+Rate limiting: 2 points
+Implement rate limiting by client IP (~5 requests/second) in a thread-safe way. Have one friend spam you with requests and another send requests just below the rate limit. Compare the throughput for both (successful requests/second).
 Lab 3
 Work in progress
 Lab 4: Multiplayer Game
@@ -91,17 +117,17 @@ Work in progress
 You will implement the MIT 6.102 (2025) Memory Scramble lab.
 A multiplayer game is a great lab for a PR course because it teaches important concepts in a fun way:
 Concurrency
-Implementing an HTTP API
+Implementing a Web API
 Curriculum
 Here is the list of topics that will be covered in this course:
 Concurrency
-Threads
-Multiprocessing (maybe?)
-Promises (async/await)
+A better definition of concurrency
+Threading
+Locks
 Network programming
 Sockets, TCP, UDP
 Protocols, HTTP
-Serialization (JSON)
+Web APIs
 Git
 Docker
 Sources

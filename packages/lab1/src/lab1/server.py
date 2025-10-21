@@ -5,20 +5,25 @@ import sys
 import os
 import urllib.parse
 import mimetypes
+import time
+import argparse
 
 
 class HTTPServer:
-    def __init__(self, directory, port):
+    def __init__(self, directory, port, simulate_delay=False, delay_seconds=0.1):
         self.directory = os.path.abspath(directory)
         self.port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.simulate_delay = simulate_delay
+        self.delay_seconds = delay_seconds
 
     def start(self):
         self.socket.bind(("0.0.0.0", self.port))
         self.socket.listen(5)
         print(f"HTTP Server started on port {self.port}")
         print(f"Serving directory: {self.directory}")
+        print(f"Simulate delay: {self.simulate_delay} ({self.delay_seconds}s)")
 
         try:
             while True:
@@ -33,6 +38,10 @@ class HTTPServer:
 
     def handle_request(self, client_socket):
         try:
+            # Simulate work delay if enabled
+            if self.simulate_delay:
+                time.sleep(self.delay_seconds)
+                
             request_data = client_socket.recv(4096).decode("utf-8")
             if not request_data:
                 return
@@ -210,26 +219,64 @@ class HTTPServer:
 
 
 def main():
-    if len(sys.argv) != 3:
-        print("Usage: uv run server.py <directory> <port>")
+    # Read environment variables with defaults
+    env_delay = float(os.getenv('HTTP_DELAY', '0.1'))
+    env_no_delay = os.getenv('HTTP_NO_DELAY', 'false').lower() == 'true'
+    env_port = int(os.getenv('HTTP_PORT', '8080'))
+    env_directory = os.getenv('HTTP_DIRECTORY', './www')
+    
+    parser = argparse.ArgumentParser(
+        description="Single-threaded HTTP File Server",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s ./www 8080
+  %(prog)s ./www 8080 --delay 0.5
+  %(prog)s ./www 8080 --no-delay
+
+Environment Variables:
+  HTTP_DIRECTORY      Directory to serve (default: ./www)
+  HTTP_PORT          Port number (default: 8080)
+  HTTP_DELAY         Delay in seconds (default: 0.1)
+  HTTP_NO_DELAY      Disable delay (default: false)
+        """
+    )
+    
+    parser.add_argument("directory", nargs='?', default=env_directory, help=f"Directory to serve files from (default: {env_directory})")
+    parser.add_argument("port", nargs='?', type=int, default=env_port, help=f"Port number to listen on (default: {env_port})")
+    
+    # Server behavior options
+    parser.add_argument("--delay", type=float, default=env_delay, metavar="SECONDS",
+                        help=f"Simulation delay per request in seconds (default: {env_delay})")
+    parser.add_argument("--no-delay", action="store_true", default=env_no_delay,
+                        help="Disable simulation delay")
+    
+    args = parser.parse_args()
+    
+    # Validate directory
+    if not os.path.exists(args.directory):
+        print(f"Error: Directory '{args.directory}' does not exist")
         sys.exit(1)
 
-    directory = sys.argv[1]
-    try:
-        port = int(sys.argv[2])
-    except ValueError:
-        print("Error: Port must be a number")
+    if not os.path.isdir(args.directory):
+        print(f"Error: '{args.directory}' is not a directory")
         sys.exit(1)
+    
+    # Configure options
+    simulate_delay = not args.no_delay
+    
+    # Show configuration
+    print("=== Server Configuration ===")
+    print(f"Directory: {args.directory}")
+    print(f"Port: {args.port}")
+    print(f"Delay: {args.delay}s (enabled: {simulate_delay})")
 
-    if not os.path.exists(directory):
-        print(f"Error: Directory '{directory}' does not exist")
-        sys.exit(1)
-
-    if not os.path.isdir(directory):
-        print(f"Error: '{directory}' is not a directory")
-        sys.exit(1)
-
-    server = HTTPServer(directory, port)
+    server = HTTPServer(
+        directory=args.directory,
+        port=args.port,
+        simulate_delay=simulate_delay,
+        delay_seconds=args.delay
+    )
     server.start()
 
 
