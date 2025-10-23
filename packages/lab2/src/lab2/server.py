@@ -30,10 +30,9 @@ class HTTPServer:
         # For request counting and rate limiting
         self.request_counts = defaultdict(int)
         self.request_lock = threading.Lock()
-        self.rate_limit_data = {}
+        self.rate_limit_data = defaultdict(list)
         self.rate_limit_lock = threading.Lock()
         self.requests_per_second = rate_limit_rps
-        self.rate_limit_window = 1.0
         self.thread_safe_counting = thread_safe_counting
         self.simulate_delay = simulate_delay
         self.delay_seconds = delay_seconds
@@ -82,20 +81,36 @@ class HTTPServer:
         current_time = time.time()
 
         with self.rate_limit_lock:
-            if client_ip not in self.rate_limit_data:
-                self.rate_limit_data[client_ip] = []
+            self.rate_limit_data[client_ip] = [
+                timestamp
+                for timestamp in self.rate_limit_data[client_ip]
+                if current_time - timestamp < 1.0
+            ]
 
-            timestamps = self.rate_limit_data[client_ip]
-
-            cutoff_time = current_time - self.rate_limit_window
-            timestamps[:] = [ts for ts in timestamps if ts > cutoff_time]
-
-            if len(timestamps) >= self.requests_per_second:
-                timestamps.append(current_time)
+            if len(self.rate_limit_data[client_ip]) >= self.requests_per_second:
                 return False
 
-            timestamps.append(current_time)
+            self.rate_limit_data[client_ip].append(current_time)
             return True
+
+    # def check_rate_limit(self, client_ip):
+    #     current_time = time.time()
+    #
+    #     with self.rate_limit_lock:
+    #         if client_ip not in self.rate_limit_data:
+    #             self.rate_limit_data[client_ip] = []
+    #
+    #         timestamps = self.rate_limit_data[client_ip]
+    #
+    #         cutoff_time = current_time - self.rate_limit_window
+    #         timestamps[:] = [ts for ts in timestamps if ts > cutoff_time]
+    #
+    #         if len(timestamps) >= self.requests_per_second:
+    #             timestamps.append(current_time)
+    #             return False
+    #
+    #         timestamps.append(current_time)
+    #         return True
 
     def increment_request_count(self, file_path):
         current_count = self.request_counts[file_path]
