@@ -221,8 +221,7 @@ class HTTPServer:
         response += "Connection: close\r\n"
         response += "\r\n"
 
-        client_socket.send(response.encode("utf-8"))
-        client_socket.send(content)
+        client_socket.sendall(response.encode("utf-8") + content)
 
     def get_content_type(self, full_path, file_ext):
         content_type = mimetypes.guess_type(full_path)[0]
