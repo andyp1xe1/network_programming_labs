@@ -13,8 +13,14 @@ from collections import defaultdict
 
 class HTTPServer:
     def __init__(
-        self, directory, port, thread_safe_counting=True, simulate_delay=False,
-        delay_seconds=0.1, rate_limit_rps=5, listen_queue=5
+        self,
+        directory,
+        port,
+        thread_safe_counting=True,
+        simulate_delay=False,
+        delay_seconds=0.1,
+        rate_limit_rps=5,
+        listen_queue=5,
     ):
         self.directory = os.path.abspath(directory)
         self.port = port
@@ -297,14 +303,14 @@ class HTTPServer:
 
 def main():
     # Read environment variables with defaults
-    env_rate_limit = int(os.getenv('HTTP_RATE_LIMIT', '5'))
-    env_delay = float(os.getenv('HTTP_DELAY', '0.1'))
-    env_unsafe_counting = os.getenv('HTTP_UNSAFE_COUNTING', 'false').lower() == 'true'
-    env_no_delay = os.getenv('HTTP_NO_DELAY', 'false').lower() == 'true'
-    env_listen_queue = int(os.getenv('HTTP_LISTEN_QUEUE', '5'))
-    env_port = int(os.getenv('HTTP_PORT', '8080'))
-    env_directory = os.getenv('HTTP_DIRECTORY', './packages/www')
-    
+    env_rate_limit = int(os.getenv("HTTP_RATE_LIMIT", "5"))
+    env_delay = float(os.getenv("HTTP_DELAY", "0.1"))
+    env_unsafe_counting = os.getenv("HTTP_UNSAFE_COUNTING", "false").lower() == "true"
+    env_no_delay = os.getenv("HTTP_NO_DELAY", "false").lower() == "true"
+    env_listen_queue = int(os.getenv("HTTP_LISTEN_QUEUE", "5"))
+    env_port = int(os.getenv("HTTP_PORT", "8080"))
+    env_directory = os.getenv("HTTP_DIRECTORY", "./packages/www")
+
     parser = argparse.ArgumentParser(
         description="Concurrent HTTP File Server with Rate Limiting",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -322,42 +328,76 @@ Environment Variables:
   HTTP_UNSAFE_COUNTING  Use unsafe counting (default: false)
   HTTP_NO_DELAY      Disable delay (default: false)
   HTTP_LISTEN_QUEUE  Listen queue size (default: 5)
-        """
+        """,
     )
-    
-    parser.add_argument("directory", nargs='?', default=env_directory, help=f"Directory to serve files from (default: {env_directory})")
-    parser.add_argument("port", nargs='?', type=int, default=env_port, help=f"Port number to listen on (default: {env_port})")
-    
+
+    parser.add_argument(
+        "directory",
+        nargs="?",
+        default=env_directory,
+        help=f"Directory to serve files from (default: {env_directory})",
+    )
+    parser.add_argument(
+        "port",
+        nargs="?",
+        type=int,
+        default=env_port,
+        help=f"Port number to listen on (default: {env_port})",
+    )
+
     # Server behavior options
-    parser.add_argument("--rate-limit", type=int, default=env_rate_limit, metavar="RPS",
-                        help=f"Rate limit in requests per second per IP (default: {env_rate_limit})")
-    parser.add_argument("--unsafe-counting", action="store_true", default=env_unsafe_counting,
-                        help="Use unsafe request counting (demonstrates race conditions)")
-    parser.add_argument("--delay", type=float, default=env_delay, metavar="SECONDS",
-                        help=f"Simulation delay per request in seconds (default: {env_delay})")
-    parser.add_argument("--no-delay", action="store_true", default=env_no_delay,
-                        help="Disable simulation delay")
-    parser.add_argument("--listen-queue", type=int, default=env_listen_queue, metavar="N",
-                        help=f"Socket listen queue size (default: {env_listen_queue})")
-    
+    parser.add_argument(
+        "--rate-limit",
+        type=int,
+        default=env_rate_limit,
+        metavar="RPS",
+        help=f"Rate limit in requests per second per IP (default: {env_rate_limit})",
+    )
+    parser.add_argument(
+        "--unsafe-counting",
+        action="store_true",
+        default=env_unsafe_counting,
+        help="Use unsafe request counting (demonstrates race conditions)",
+    )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=env_delay,
+        metavar="SECONDS",
+        help=f"Simulation delay per request in seconds (default: {env_delay})",
+    )
+    parser.add_argument(
+        "--no-delay",
+        action="store_true",
+        default=env_no_delay,
+        help="Disable simulation delay",
+    )
+    parser.add_argument(
+        "--listen-queue",
+        type=int,
+        default=env_listen_queue,
+        metavar="N",
+        help=f"Socket listen queue size (default: {env_listen_queue})",
+    )
+
     args = parser.parse_args()
-    
+
     # Validate directory
     if not os.path.exists(args.directory):
         print(f"Error: Directory '{args.directory}' does not exist")
         sys.exit(1)
-    
+
     if not os.path.isdir(args.directory):
         print(f"Error: '{args.directory}' is not a directory")
         sys.exit(1)
-    
+
     # Configure options
     thread_safe_counting = not args.unsafe_counting
     simulate_delay = not args.no_delay
-    
+
     if args.unsafe_counting:
         print("WARNING: Using unsafe request counting (race conditions possible)")
-    
+
     # Show configuration source
     print("=== Server Configuration ===")
     print(f"Directory: {args.directory}")
@@ -366,7 +406,7 @@ Environment Variables:
     print(f"Delay: {args.delay}s (enabled: {simulate_delay})")
     print(f"Thread-safe counting: {thread_safe_counting}")
     print(f"Listen queue: {args.listen_queue}")
-    
+
     server = HTTPServer(
         directory=args.directory,
         port=args.port,
@@ -374,7 +414,7 @@ Environment Variables:
         simulate_delay=simulate_delay,
         delay_seconds=args.delay,
         rate_limit_rps=args.rate_limit,
-        listen_queue=args.listen_queue
+        listen_queue=args.listen_queue,
     )
     server.start()
 
