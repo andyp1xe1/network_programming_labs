@@ -30,9 +30,10 @@ class HTTPServer:
         # For request counting and rate limiting
         self.request_counts = defaultdict(int)
         self.request_lock = threading.Lock()
-        self.rate_limit_data = defaultdict(list)
+        self.rate_limit_data = {}
         self.rate_limit_lock = threading.Lock()
         self.requests_per_second = rate_limit_rps
+        self.rate_limit_window = 1.0
         self.thread_safe_counting = thread_safe_counting
         self.simulate_delay = simulate_delay
         self.delay_seconds = delay_seconds
@@ -81,19 +82,19 @@ class HTTPServer:
         current_time = time.time()
 
         with self.rate_limit_lock:
-            # Clean old requests (older than 1 second)
-            self.rate_limit_data[client_ip] = [
-                timestamp
-                for timestamp in self.rate_limit_data[client_ip]
-                if current_time - timestamp < 1.0
-            ]
+            if client_ip not in self.rate_limit_data:
+                self.rate_limit_data[client_ip] = []
 
-            # Check if rate limit exceeded
-            if len(self.rate_limit_data[client_ip]) >= self.requests_per_second:
+            timestamps = self.rate_limit_data[client_ip]
+
+            cutoff_time = current_time - self.rate_limit_window
+            timestamps[:] = [ts for ts in timestamps if ts > cutoff_time]
+
+            if len(timestamps) >= self.requests_per_second:
+                timestamps.append(current_time)
                 return False
 
-            # Add current request
-            self.rate_limit_data[client_ip].append(current_time)
+            timestamps.append(current_time)
             return True
 
     def increment_request_count(self, file_path):
