@@ -1,19 +1,6 @@
 # Lab 3: Memory Scramble - Concurrent Game Server
 
-A multi-player Memory Scramble game server implemented in Go, featuring concurrent gameplay, thread-safe operations, and a web-based user interface. This implementation follows the MIT 6.102 Problem Set 4 specification with comprehensive game rules and HTTP API endpoints.
-
-## Project Overview
-
-Memory Scramble is a multi-player card matching game where players flip cards to find matching pairs. The server manages concurrent gameplay, enforces game rules, and provides real-time updates to players through both polling and WebSocket-like watching mechanisms.
-
-### Key Features
-
-- **Thread-Safe Game Board**: Complete ADT implementation with proper concurrency control
-- **Multi-Player Support**: Concurrent gameplay with player isolation and synchronization  
-- **Real-time Updates**: Both polling and watching mechanisms for live game updates
-- **Web Interface**: Complete HTML/CSS/JavaScript client for browser-based gameplay
-- **Comprehensive Testing**: Full test suite covering all game rules and edge cases
-- **HTTP API**: RESTful endpoints for all game operations
+A multi-player Memory Scramble game server implemented in Go, featuring concurrent gameplay, thread-safe operations, and a web-based user interface. This implementation follows the MIT 6.102 Problem Set 4 specification.
 
 ## Project Structure
 
@@ -315,48 +302,3 @@ The `board` package implements a complete ADT with proper abstraction function, 
 - **Safari Compatibility**: Special handling for Safari's localhost restrictions
 - **Mobile Responsive**: Bootstrap-based responsive design
 
-## Performance Characteristics
-
-### Concurrent Operations
-- **Thread-Safe Reads**: Multiple players can view board simultaneously
-- **Exclusive Writes**: Card flips and updates properly serialized
-- **Non-Blocking Watches**: Efficient long-polling implementation  
-- **Memory Efficient**: Minimal allocation during gameplay
-
-### Scalability Features
-- **Per-Player State**: Independent player tracking
-- **Event-Driven Updates**: Only notify watchers on actual changes
-- **Efficient Locking**: Separate read/write locks for optimal concurrency
-- **Resource Cleanup**: Automatic cleanup of abandoned connections
-
-## Common Issues and Solutions
-
-### Connection Problems
-**Issue**: Browser blocks HTTP requests from HTTPS pages
-**Solution**: Save HTML file locally or use localhost with HTTP
-
-### Game State Issues  
-**Issue**: Board appears frozen or out of sync
-**Solution**: Use restart endpoint or refresh browser page
-
-### Performance Issues
-**Issue**: Slow response times with many players
-**Solution**: Use watching mode instead of polling for real-time updates
-
-## Contributing
-
-### Code Standards
-- Follow standard Go formatting (`gofmt`)
-- Include comprehensive comments for public APIs
-- Maintain ADT invariants and document them  
-- Add test cases for new functionality
-
-### Testing Requirements
-- All new features must include test coverage
-- Tests should cover both success and error cases
-- Concurrency tests for any shared state modifications
-- Integration tests for new API endpoints
-
----
-
-*Implementation based on MIT 6.102 Problem Set 4 specification. Built with Go 1.25, thread-safe concurrency, and comprehensive testing framework.*
