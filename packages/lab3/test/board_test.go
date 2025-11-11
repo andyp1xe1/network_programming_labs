@@ -15,7 +15,7 @@ import (
 // Test board parsing from file
 func TestParseFromFile(t *testing.T) {
 	t.Run("Valid 2x2 board", func(t *testing.T) {
-		content := "2x2\n🦄\n🌈\n🦄\n🌈\n"
+		content := "2x2\nX\nO\nX\nO\n"
 		tmpFile, err := createTempFile(content)
 		if err != nil {
 			t.Fatalf("Failed to create temp file: %v", err)
