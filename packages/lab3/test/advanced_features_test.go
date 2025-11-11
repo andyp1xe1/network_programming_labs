@@ -160,10 +160,13 @@ func TestReplaceCardFeature(t *testing.T) {
 		}
 
 		// Third card (face down A) should also be replaced
+		// Player2 flips it as second card - B and C don't match, so Rule 2-E applies
 		b.Flip("player2", 2, 0)
 		result2 = b.Look("player2")
-		if !strings.Contains(result2, "my C") {
-			t.Error("Face-down replaced card should show new content when flipped")
+		// Player2 should NOT control the C (Rule 2-E: relinquish control of non-matching cards)
+		// But the card should show the replaced content when face up
+		if !strings.Contains(result2, "up C") {
+			t.Error("Face-up replaced card should show new content, but player should not control it due to Rule 2-E")
 		}
 	})
 }

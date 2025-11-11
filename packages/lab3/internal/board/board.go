@@ -11,11 +11,13 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"slices"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 // CardStatus represents the state of a card from a player's perspective
@@ -152,6 +154,9 @@ func (b *Board) Look(playerID string) string {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
+	// Log the look action
+	// log.Printf("[GAME_LOG] %s | LOOK | Player: %s", time.Now().Format("15:04:05.000"), playerID)
+
 	// Ensure player exists
 	if _, exists := b.players[playerID]; !exists {
 		b.players[playerID] = &PlayerState{
@@ -240,6 +245,10 @@ func (b *Board) Flip(playerID string, row, col int) error {
 
 	pos := Position{row, col}
 
+	// Log the flip attempt with current board state
+	log.Printf("[GAME_LOG] %s | FLIP_START | Player: %s | Position: (%d,%d) | Board_State: %s",
+		time.Now().Format("15:04:05.000"), playerID, row, col, b.getBoardStateForLog())
+
 	// Validate position
 	if !b.isValidPosition(pos) {
 		return errors.New("invalid position")
@@ -279,16 +288,28 @@ func (b *Board) Flip(playerID string, row, col int) error {
 	switch controlledCount {
 	case 0:
 		// Trying to flip first card
-		return b.flipFirstCard(player, pos, card)
+		err := b.flipFirstCard(player, pos, card)
+		log.Printf("[GAME_LOG] %s | FLIP_FIRST_CARD | Player: %s | Position: (%d,%d) | Result: %v | Board_State: %s",
+			time.Now().Format("15:04:05.000"), player.ID, pos.Row, pos.Col, err, b.getBoardStateForLog())
+		return err
 	case 1:
 		// Trying to flip second card
-		return b.flipSecondCard(player, pos, card, playerID)
+		err := b.flipSecondCard(player, pos, card, playerID)
+		log.Printf("[GAME_LOG] %s | FLIP_SECOND_CARD | Player: %s | Position: (%d,%d) | Result: %v | Board_State: %s",
+			time.Now().Format("15:04:05.000"), player.ID, pos.Row, pos.Col, err, b.getBoardStateForLog())
+		return err
 	case 2:
 		// Player controls 2 cards - this should not happen after processing previous cards
-		return errors.New("player already controls two cards")
+		err := errors.New("player already controls two cards")
+		log.Printf("[GAME_LOG] %s | FLIP_ERROR | Player: %s | Error: %s",
+			time.Now().Format("15:04:05.000"), player.ID, err.Error())
+		return err
 	}
 
-	return errors.New("invalid player state")
+	err := errors.New("invalid player state")
+	log.Printf("[GAME_LOG] %s | FLIP_ERROR | Player: %s | Error: %s",
+		time.Now().Format("15:04:05.000"), player.ID, err.Error())
+	return err
 }
 
 // Helper methods
@@ -319,6 +340,8 @@ func (b *Board) flipFirstCard(player *PlayerState, pos Position, card *Card) err
 		card.FaceUp = true
 		player.ControlledPos = append(player.ControlledPos, pos)
 		b.incrementVersion()
+		log.Printf("[GAME_LOG] %s | RULE_1B | Player: %s | Card: %s | Action: Flipped face up and gained control",
+			time.Now().Format("15:04:05.000"), player.ID, card.Content)
 		return nil
 	}
 
@@ -326,12 +349,16 @@ func (b *Board) flipFirstCard(player *PlayerState, pos Position, card *Card) err
 	controller := b.getController(pos)
 	if controller == nil {
 		player.ControlledPos = append(player.ControlledPos, pos)
+		log.Printf("[GAME_LOG] %s | RULE_1C | Player: %s | Card: %s | Action: Gained control of uncontrolled card",
+			time.Now().Format("15:04:05.000"), player.ID, card.Content)
 		return nil
 	}
 
 	// Rule 1-D: Card is controlled by another player - set waiting state
 	player.Waiting = true
 	player.WaitingPos = &pos
+	log.Printf("[GAME_LOG] %s | RULE_1D | Player: %s | Card: %s | Controller: %s | Action: Waiting for card",
+		time.Now().Format("15:04:05.000"), player.ID, card.Content, controller.ID)
 	return errors.New("waiting for card to become available")
 }
 
@@ -350,8 +377,13 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 	if card == nil {
 		// Relinquish control of first card (Rule 2-A)
 		player.ControlledPos = player.ControlledPos[:0]
+		// Store first card for Rule 3-B processing on next move
+		player.PreviousCards = []Position{firstPos}
+		player.CardsMatched = false
 		// First card remains face up but uncontrolled
 		b.notifyWaitingPlayers() // Notify waiting players
+		log.Printf("[GAME_LOG] %s | RULE_2A | Player: %s | FirstCard: %s | Action: No card at second position, stored first card for Rule 3-B",
+			time.Now().Format("15:04:05.000"), player.ID, firstCard.Content)
 		return errors.New("no card at position")
 	}
 
@@ -360,6 +392,11 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 	if card.FaceUp && controller != nil {
 		// Relinquish control of first card (Rule 2-B)
 		player.ControlledPos = player.ControlledPos[:0]
+		// Store first card for Rule 3-B processing on next move
+		player.PreviousCards = []Position{firstPos}
+		player.CardsMatched = false
+		log.Printf("[GAME_LOG] %s | RULE_2B | Player: %s | FirstCard: %s | SecondCard: %s | Controller: %s | Action: Second card controlled by another player, stored first card for Rule 3-B",
+			time.Now().Format("15:04:05.000"), player.ID, firstCard.Content, card.Content, controller.ID)
 		// First card remains face up but uncontrolled
 		b.notifyWaitingPlayers() // Notify waiting players
 		return errors.New("card controlled by another player")
@@ -369,6 +406,8 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 	if !card.FaceUp {
 		card.FaceUp = true
 		b.incrementVersion()
+		log.Printf("[GAME_LOG] %s | RULE_2C | Player: %s | Card: %s | Action: Flipped second card face up",
+			time.Now().Format("15:04:05.000"), player.ID, card.Content)
 	}
 
 	// Rule 2-D & 2-E: Check if cards match
@@ -379,6 +418,8 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 		player.PreviousCards = []Position{firstPos, pos}
 		player.CardsMatched = true
 		// Note: Player keeps control until they make next move (for display purposes)
+		log.Printf("[GAME_LOG] %s | RULE_2D | Player: %s | Cards: %s,%s | Action: MATCH! Keeping control, will remove on next move",
+			time.Now().Format("15:04:05.000"), player.ID, firstCard.Content, card.Content)
 	} else {
 		// Rule 2-E: No match, relinquish control but cards stay face up
 		player.PreviousCards = []Position{firstPos, pos}
@@ -386,18 +427,8 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 		player.ControlledPos = player.ControlledPos[:0] // Clear controlled positions immediately
 		// Cards remain face up but uncontrolled (Rule 2-E)
 		b.notifyWaitingPlayers() // Notify waiting players
-
-		// Special case for replacement scenarios: if the second card content matches
-		// any controlled card on the board by any player, allow this player to control it
-		for _, otherPlayer := range b.players {
-			for _, controlledPos := range otherPlayer.ControlledPos {
-				if b.cards[controlledPos.Row][controlledPos.Col] != nil &&
-					b.cards[controlledPos.Row][controlledPos.Col].Content == card.Content {
-					player.ControlledPos = append(player.ControlledPos, pos)
-					return nil
-				}
-			}
-		}
+		log.Printf("[GAME_LOG] %s | RULE_2E | Player: %s | Cards: %s,%s | Action: NO MATCH, relinquished control but cards stay face up",
+			time.Now().Format("15:04:05.000"), player.ID, firstCard.Content, card.Content)
 	}
 
 	return nil
@@ -411,21 +442,32 @@ func (b *Board) processPreviousCards(player *PlayerState) {
 
 	if player.CardsMatched {
 		// Rule 3-A: Remove matching cards from board
+		var removedCards []string
 		for _, pos := range player.PreviousCards {
 			if b.isValidPosition(pos) {
+				card := b.cards[pos.Row][pos.Col]
+				if card != nil {
+					removedCards = append(removedCards, card.Content)
+				}
 				b.cards[pos.Row][pos.Col] = nil
 			}
 		}
+		log.Printf("[GAME_LOG] %s | RULE_3A | Player: %s | Cards: %v | Action: REMOVED matching cards from board",
+			time.Now().Format("15:04:05.000"), player.ID, removedCards)
 	} else {
 		// Rule 3-B: Turn non-matching cards face down if still uncontrolled
+		var flippedCards []string
 		for _, pos := range player.PreviousCards {
 			if b.isValidPosition(pos) {
 				card := b.cards[pos.Row][pos.Col]
 				if card != nil && card.FaceUp && b.getController(pos) == nil {
+					flippedCards = append(flippedCards, card.Content)
 					card.FaceUp = false
 				}
 			}
 		}
+		log.Printf("[GAME_LOG] %s | RULE_3B | Player: %s | Cards: %v | Action: Flipped non-matching cards face down",
+			time.Now().Format("15:04:05.000"), player.ID, flippedCards)
 	}
 
 	// Clear previous cards state
@@ -656,6 +698,55 @@ func (b *Board) String() string {
 			}
 		}
 		result.WriteString("\n")
+	}
+
+	return result.String()
+}
+
+// getBoardStateForLog returns a compact representation of the board state for logging
+func (b *Board) getBoardStateForLog() string {
+	var result strings.Builder
+
+	// Add board dimensions
+	result.WriteString(fmt.Sprintf("(%dx%d)", b.rows, b.cols))
+
+	// Add card states in compact format
+	result.WriteString(" Cards:")
+	for r := 0; r < b.rows; r++ {
+		for c := 0; c < b.cols; c++ {
+			card := b.cards[r][c]
+			if card == nil {
+				result.WriteString(" _")
+			} else if card.FaceUp {
+				// Find who controls this card
+				controller := ""
+				for playerID, player := range b.players {
+					for _, pos := range player.ControlledPos {
+						if pos.Row == r && pos.Col == c {
+							controller = playerID
+							break
+						}
+					}
+					if controller != "" {
+						break
+					}
+				}
+				if controller != "" {
+					result.WriteString(fmt.Sprintf(" %s[%s]", card.Content, controller))
+				} else {
+					result.WriteString(fmt.Sprintf(" %s[uncontrolled]", card.Content))
+				}
+			} else {
+				result.WriteString(" ?")
+			}
+		}
+	}
+
+	// Add player states
+	result.WriteString(" Players:")
+	for playerID, player := range b.players {
+		result.WriteString(fmt.Sprintf(" %s(ctrl:%d,prev:%d,wait:%v)",
+			playerID, len(player.ControlledPos), len(player.PreviousCards), player.Waiting))
 	}
 
 	return result.String()

@@ -59,13 +59,14 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLook(w http.ResponseWriter, r *http.Request) {
 	// Extract player ID from path: /look/{playerID}
-	path := strings.TrimPrefix(r.URL.Path, "/look/")
-	playerID := path
-
+	playerID := strings.TrimPrefix(r.URL.Path, "/look/")
 	if playerID == "" {
 		http.Error(w, "Missing player ID", http.StatusBadRequest)
 		return
 	}
+
+	// log.Printf("[HTTP_LOG] %s | LOOK | Player: %s | IP: %s",
+	// 	r.Header.Get("X-Real-IP"), playerID, r.RemoteAddr)
 
 	result, err := commands.Look(playerID)
 	if err != nil {
@@ -95,6 +96,9 @@ func (s *Server) handleFlip(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Missing player ID or position", http.StatusBadRequest)
 		return
 	}
+
+	log.Printf("[HTTP_LOG] %s | FLIP | Player: %s | Position: %s | IP: %s",
+		r.Header.Get("X-Real-IP"), playerID, position, r.RemoteAddr)
 
 	result, err := commands.Flip(playerID, position)
 	if err != nil {
