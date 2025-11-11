@@ -64,6 +64,7 @@ type Board struct {
 	version    int64                    // Board version for change detection
 	watchers   map[string][]chan string // Player ID -> list of watch channels
 	watchMutex sync.RWMutex             // Separate mutex for watchers
+	filename   string                   // Original board file for restart functionality
 }
 
 // ParseFromFile creates a new board by parsing the given file.
@@ -138,6 +139,7 @@ func ParseFromFile(filename string) (*Board, error) {
 		players:  make(map[string]*PlayerState),
 		version:  1,
 		watchers: make(map[string][]chan string),
+		filename: filename,
 	}
 
 	board.checkRep()
@@ -487,45 +489,36 @@ func (b *Board) ReplaceCard(fromCard, toCard string) error {
 	return nil
 }
 
-// Restart resets the board to its initial state
+// Restart resets the board to its initial state by reloading from the original file.
+// This is equivalent to restarting the entire program.
 func (b *Board) Restart() error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	// Reset all cards to face-down
-	for r := 0; r < b.rows; r++ {
-		for c := 0; c < b.cols; c++ {
-			if b.cards[r][c] != nil {
-				b.cards[r][c].FaceUp = false
-			}
-		}
-	}
-
-	// Clear all player states
-	for playerID := range b.players {
-		b.players[playerID] = &PlayerState{
-			ID:            playerID,
-			ControlledPos: make([]Position, 0, 2),
-			PreviousCards: make([]Position, 0, 2),
-			CardsMatched:  false,
-			Waiting:       false,
-			WaitingPos:    nil,
-			WaitChannel:   make(chan bool, 1),
-		}
-	}
-
-	// Clear all watchers
+	// Close all existing watchers before reloading
 	b.watchMutex.Lock()
 	for playerID := range b.watchers {
-		// Close all watch channels
 		for _, ch := range b.watchers[playerID] {
 			close(ch)
 		}
 	}
-	b.watchers = make(map[string][]chan string)
 	b.watchMutex.Unlock()
 
-	b.incrementVersion()
+	// Reload the board from the original file
+	newBoard, err := ParseFromFile(b.filename)
+	if err != nil {
+		return fmt.Errorf("failed to restart board: %w", err)
+	}
+
+	// Replace all board state with fresh data from file
+	b.cards = newBoard.cards
+	b.rows = newBoard.rows
+	b.cols = newBoard.cols
+	b.players = make(map[string]*PlayerState)
+	b.version = 1
+	b.watchers = make(map[string][]chan string)
+	// Keep the same filename for future restarts
+
 	return nil
 }
 

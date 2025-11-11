@@ -487,20 +487,38 @@ func TestWatchFunctionality(t *testing.T) {
 func TestRestartBoard(t *testing.T) {
 	t.Run("Restart resets all game state", func(t *testing.T) {
 		content := "2x1\nA\nB\n"
-		b := createTestBoard(t, content)
 
-		// Make some moves
+		// Create temporary file but don't delete it until after the test
+		tmpFile, err := createTempFile(content)
+		if err != nil {
+			t.Fatalf("Failed to create temp file: %v", err)
+		}
+		defer os.Remove(tmpFile)
+
+		// Parse board from file
+		b, err := board.ParseFromFile(tmpFile)
+		if err != nil {
+			t.Fatalf("ParseFromFile failed: %v", err)
+		}
+
+		// Make some moves that modify the board
 		b.Flip("player1", 0, 0)
 		b.Flip("player1", 1, 0)
 
-		// Restart
-		err := b.Restart()
+		// Verify the board is modified
+		result := b.Look("player1")
+		if !strings.Contains(result, "A") || !strings.Contains(result, "B") {
+			t.Error("Board should have cards face up before restart")
+		}
+
+		// Restart - this should reload the entire board from the original file
+		err = b.Restart()
 		if err != nil {
 			t.Errorf("Restart failed: %v", err)
 		}
 
-		// All cards should be face down
-		result := b.Look("player1")
+		// All cards should be face down (back to initial state)
+		result = b.Look("player1")
 		lines := strings.Split(strings.TrimSpace(result), "\n")
 
 		if lines[1] != "down" || lines[2] != "down" {
@@ -510,6 +528,13 @@ func TestRestartBoard(t *testing.T) {
 		// Player should not control any cards
 		if strings.Contains(result, "my") {
 			t.Error("Player should not control any cards after restart")
+		}
+
+		// Test that the board is truly reset - we can make the same moves again
+		b.Flip("player1", 0, 0)
+		result = b.Look("player1")
+		if !strings.Contains(result, "A") {
+			t.Error("After restart, should be able to flip cards normally again")
 		}
 	})
 }
@@ -591,7 +616,20 @@ func TestCommandsAPI(t *testing.T) {
 
 	t.Run("Commands Restart function", func(t *testing.T) {
 		content := "1x1\nA\n"
-		b := createTestBoard(t, content)
+
+		// Create temporary file but don't delete it until after the test
+		tmpFile, err := createTempFile(content)
+		if err != nil {
+			t.Fatalf("Failed to create temp file: %v", err)
+		}
+		defer os.Remove(tmpFile)
+
+		// Parse board from file
+		b, err := board.ParseFromFile(tmpFile)
+		if err != nil {
+			t.Fatalf("ParseFromFile failed: %v", err)
+		}
+
 		commands.SetBoard(b)
 
 		result, err := commands.Restart()
