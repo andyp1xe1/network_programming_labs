@@ -31,6 +31,8 @@ type Card struct {
 type PlayerState struct {
 	ID            string
 	ControlledPos []Position // Positions of cards controlled by this player
+	PreviousCards []Position // Previous cards that need processing on next move (Rule 3)
+	CardsMatched  bool       // Whether previous cards matched (for Rule 3-A vs 3-B)
 	Waiting       bool       // Whether player is waiting for a card
 	WaitingPos    *Position  // Position player is waiting for (if any)
 	WaitChannel   chan bool  // Channel for notifying when wait is over
@@ -162,6 +164,8 @@ func (b *Board) Look(playerID string) string {
 		b.players[playerID] = &PlayerState{
 			ID:            playerID,
 			ControlledPos: make([]Position, 0, 2),
+			PreviousCards: make([]Position, 0, 2),
+			CardsMatched:  false,
 			Waiting:       false,
 			WaitingPos:    nil,
 			WaitChannel:   make(chan bool, 1),
@@ -245,6 +249,8 @@ func (b *Board) Flip(playerID string, row, col int) error {
 		b.players[playerID] = &PlayerState{
 			ID:            playerID,
 			ControlledPos: make([]Position, 0, 2),
+			PreviousCards: make([]Position, 0, 2),
+			CardsMatched:  false,
 			Waiting:       false,
 			WaitingPos:    nil,
 			WaitChannel:   make(chan bool, 1),
@@ -263,13 +269,28 @@ func (b *Board) Flip(playerID string, row, col int) error {
 
 	if controlledCount == 0 {
 		// Trying to flip first card
+		// Rule 3: If player has previous cards, process them first
+		if len(player.PreviousCards) > 0 {
+			b.processPreviousCards(player)
+		}
 		return b.flipFirstCard(player, pos, card)
 	} else if controlledCount == 1 {
 		// Trying to flip second card
 		return b.flipSecondCard(player, pos, card, playerID)
+	} else if controlledCount == 2 {
+		// Player controls 2 cards - can't flip more until processing next move
+		// But if they have previous cards to process, they're starting a new move
+		if len(player.PreviousCards) > 0 {
+			// Process previous cards first, then try the flip as new first card
+			b.processPreviousCards(player)
+			// Clear controlled positions since we processed the cards
+			player.ControlledPos = player.ControlledPos[:0]
+			return b.flipFirstCard(player, pos, card)
+		}
+		return errors.New("player already controls two cards")
 	}
 
-	return errors.New("player already controls two cards")
+	return errors.New("invalid player state")
 }
 
 // Helper methods
@@ -302,16 +323,18 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 
 	// Rule 2-A: No card at position
 	if card == nil {
-		// Relinquish control of first card
+		// Relinquish control of first card (Rule 2-A)
 		player.ControlledPos = player.ControlledPos[:0]
+		// First card remains face up but uncontrolled
 		return errors.New("no card at position")
 	}
 
 	// Rule 2-B: Card is controlled by a player
 	controller := b.getController(pos)
 	if card.FaceUp && controller != nil {
-		// Relinquish control of first card
+		// Relinquish control of first card (Rule 2-B)
 		player.ControlledPos = player.ControlledPos[:0]
+		// First card remains face up but uncontrolled
 		return errors.New("card controlled by another player")
 	}
 
@@ -323,51 +346,51 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 
 	// Rule 2-D & 2-E: Check if cards match
 	if firstCard.Content == card.Content {
-		// Match! Keep control of both cards
+		// Rule 2-D: Match! Keep control of both cards temporarily
 		player.ControlledPos = append(player.ControlledPos, pos)
+		// Store for Rule 3-A processing on next move
+		player.PreviousCards = []Position{firstPos, pos}
+		player.CardsMatched = true
+		// Note: Player keeps control until they make next move (for display purposes)
 	} else {
-		// No match, but still add the position temporarily
-		player.ControlledPos = append(player.ControlledPos, pos)
+		// Rule 2-E: No match, relinquish control but cards stay face up
+		player.PreviousCards = []Position{firstPos, pos}
+		player.CardsMatched = false
+		player.ControlledPos = player.ControlledPos[:0] // Clear controlled positions immediately
+		// Cards remain face up but uncontrolled (Rule 2-E)
 	}
-
-	// Rule 3: Process the result of the second flip
-	go b.processNextMove(playerID)
 
 	return nil
 }
 
-func (b *Board) processNextMove(playerID string) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-
-	player := b.players[playerID]
-	if player == nil || len(player.ControlledPos) != 2 {
+// processPreviousCards processes cards from previous move according to Rules 3-A and 3-B
+func (b *Board) processPreviousCards(player *PlayerState) {
+	if len(player.PreviousCards) == 0 {
 		return
 	}
 
-	// Get the two cards
-	pos1 := player.ControlledPos[0]
-	pos2 := player.ControlledPos[1]
-	card1 := b.cards[pos1.Row][pos1.Col]
-	card2 := b.cards[pos2.Row][pos2.Col]
-
-	// Check if they match
-	if card1 != nil && card2 != nil && card1.Content == card2.Content {
-		// Rule 3-A: Remove matching cards
-		b.cards[pos1.Row][pos1.Col] = nil
-		b.cards[pos2.Row][pos2.Col] = nil
-	} else {
-		// Rule 3-B: Turn non-matching cards face down
-		if card1 != nil {
-			card1.FaceUp = false
+	if player.CardsMatched {
+		// Rule 3-A: Remove matching cards from board
+		for _, pos := range player.PreviousCards {
+			if b.isValidPosition(pos) {
+				b.cards[pos.Row][pos.Col] = nil
+			}
 		}
-		if card2 != nil {
-			card2.FaceUp = false
+	} else {
+		// Rule 3-B: Turn non-matching cards face down if still uncontrolled
+		for _, pos := range player.PreviousCards {
+			if b.isValidPosition(pos) {
+				card := b.cards[pos.Row][pos.Col]
+				if card != nil && card.FaceUp && b.getController(pos) == nil {
+					card.FaceUp = false
+				}
+			}
 		}
 	}
 
-	// Clear player's controlled positions
-	player.ControlledPos = player.ControlledPos[:0]
+	// Clear previous cards state
+	player.PreviousCards = player.PreviousCards[:0]
+	player.CardsMatched = false
 
 	// Increment version to notify watchers
 	b.incrementVersion()
@@ -493,6 +516,8 @@ func (b *Board) Restart() error {
 		b.players[playerID] = &PlayerState{
 			ID:            playerID,
 			ControlledPos: make([]Position, 0, 2),
+			PreviousCards: make([]Position, 0, 2),
+			CardsMatched:  false,
 			Waiting:       false,
 			WaitingPos:    nil,
 			WaitChannel:   make(chan bool, 1),

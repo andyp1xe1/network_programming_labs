@@ -137,24 +137,36 @@ func TestRule1FirstCard(t *testing.T) {
 		content := "2x1\nA\nB\n"
 		b := createTestBoard(t, content)
 
-		// Player1 flips first card and second (non-matching)
+		// Player1 flips first card and second (non-matching) - Rule 2-E applies
 		b.Flip("player1", 0, 0)
 		b.Flip("player1", 1, 0)
 
-		// Wait for cards to process (go routine in flipSecondCard)
+		// Wait for cards to process
 		time.Sleep(10 * time.Millisecond)
 
-		// Now player2 should be able to take control of the face-up cards
-		err := b.Flip("player2", 0, 0)
-		if err != nil {
-			t.Errorf("Player2 should be able to take control of face-up card: %v", err)
+		// Verify cards are face up but uncontrolled (Rule 2-E result)
+		result := b.Look("player2")
+		if !strings.Contains(result, "up A") || !strings.Contains(result, "up B") {
+			t.Error("Cards should be face up and uncontrolled after Rule 2-E")
 		}
 
-		result := b.Look("player2")
+		// Rule 1-C: Player2 should be able to take control of face-up uncontrolled card
+		err := b.Flip("player2", 0, 0)
+		if err != nil {
+			t.Errorf("Player2 should be able to take control of face-up uncontrolled card (Rule 1-C): %v", err)
+		}
+
+		result = b.Look("player2")
 		lines := strings.Split(strings.TrimSpace(result), "\n")
 
-		if !strings.Contains(lines[1], "my A") {
-			t.Errorf("Expected player2 to control card A, got '%s'", lines[1])
+		if lines[1] != "my A" {
+			t.Errorf("Expected player2 to control card A (Rule 1-C), got '%s'", lines[1])
+		}
+
+		// Verify the card is still face up for other players but shown as controlled
+		result = b.Look("player1")
+		if !strings.Contains(result, "up A") {
+			t.Error("Card should appear as 'up' to other players when controlled by someone else")
 		}
 	})
 
@@ -262,17 +274,18 @@ func TestRule2SecondCard(t *testing.T) {
 		b.Flip("player1", 0, 0) // First A
 		b.Flip("player1", 1, 0) // Second B (non-matching)
 
-		// Give processNextMove goroutine time to run
+		// Give Rule 3-A processing time to complete
 		time.Sleep(10 * time.Millisecond)
 
 		result := b.Look("player1")
 
-		// Cards should be face down (turned back over)
+		// According to Rule 2-E: cards should remain face up but player relinquishes control
 		if strings.Contains(result, "my A") || strings.Contains(result, "my B") {
 			t.Error("Player should have relinquished control of non-matching cards")
 		}
-		if strings.Contains(result, "up A") || strings.Contains(result, "up B") {
-			t.Error("Non-matching cards should be turned face down")
+		// MIT Rule 2-E: cards remain face up for now
+		if !strings.Contains(result, "up A") || !strings.Contains(result, "up B") {
+			t.Error("Non-matching cards should remain face up after mismatch (Rule 2-E)")
 		}
 	})
 }
@@ -290,7 +303,7 @@ func TestRule3NextMove(t *testing.T) {
 		// Start next move to trigger rule 3-A
 		b.Flip("player1", 0, 0) // This should trigger removal of matched cards
 
-		// Give processNextMove time to complete
+		// Give Rule 3-A processing time to complete
 		time.Sleep(10 * time.Millisecond)
 
 		result := b.Look("player1")
@@ -302,7 +315,7 @@ func TestRule3NextMove(t *testing.T) {
 		}
 	})
 
-	t.Run("Rule 3-B: Non-matching cards turn face down", func(t *testing.T) {
+	t.Run("Rule 3-B: Non-matching cards turn face down on next move", func(t *testing.T) {
 		content := "3x1\nA\nB\nC\n"
 		b := createTestBoard(t, content)
 
@@ -310,31 +323,39 @@ func TestRule3NextMove(t *testing.T) {
 		b.Flip("player1", 0, 0) // A
 		b.Flip("player1", 1, 0) // B (non-matching)
 
-		// Give processNextMove time to complete the turning cards face down
-		time.Sleep(50 * time.Millisecond)
+		// Give Rule 2-E processing time to complete
+		time.Sleep(10 * time.Millisecond)
 
 		result := b.Look("player1")
-		lines := strings.Split(strings.TrimSpace(result), "\n")
 
-		// Previous cards should be face down
-		if lines[1] != "down" || lines[2] != "down" {
-			t.Errorf("Expected non-matching cards to be face down, got: %s, %s", lines[1], lines[2])
+		// According to Rule 2-E: cards should stay face up after mismatch
+		if !strings.Contains(result, "up A") || !strings.Contains(result, "up B") {
+			t.Error("Cards should remain face up after mismatch until next move")
 		}
 
-		// Player should no longer control any cards
-		if strings.Contains(result, "my") {
-			t.Error("Player should not control any cards after non-matching flip")
+		// Player should no longer control any cards (Rule 2-E)
+		if strings.Contains(result, "my A") || strings.Contains(result, "my B") {
+			t.Error("Player should have relinquished control after mismatch")
 		}
 
-		// Now try to start a new move - this should work
+		// NOW - Rule 3-B: When player makes next move, previous cards turn face down
 		err := b.Flip("player1", 2, 0) // Try to flip C as new first card
 		if err != nil {
 			t.Errorf("Starting new move should succeed: %v", err)
 		}
 
-		// Check that player now controls the new card
+		// Give time for Rule 3-B to process
+		time.Sleep(10 * time.Millisecond)
+
+		// Check that previous non-matching cards are now face down (Rule 3-B)
 		result = b.Look("player1")
-		lines = strings.Split(strings.TrimSpace(result), "\n")
+		lines := strings.Split(strings.TrimSpace(result), "\n")
+
+		if lines[1] != "down" || lines[2] != "down" {
+			t.Errorf("Expected previous non-matching cards to be face down after next move (Rule 3-B), got: %s, %s", lines[1], lines[2])
+		}
+
+		// Check that player now controls the new card
 		if lines[3] != "my C" {
 			t.Errorf("Expected new card to be controlled, got: %s", lines[3])
 		}
@@ -595,18 +616,133 @@ func TestCommandsAPI(t *testing.T) {
 
 // Test edge cases and error conditions
 func TestEdgeCases(t *testing.T) {
-	t.Run("Player tries to flip third card", func(t *testing.T) {
-		content := "3x1\nA\nB\nC\n"
+	t.Run("Complex multi-player card interaction scenario", func(t *testing.T) {
+		// Setup: 4 cards in a 2x2 grid for the scenario
+		content := "2x2\nA\nB\nA\nB\n"
 		b := createTestBoard(t, content)
 
-		// Player controls two cards
-		b.Flip("player1", 0, 0)
-		b.Flip("player1", 1, 0)
+		// Step 1: p1 turns c1 (0,0 - A)
+		err := b.Flip("p1", 0, 0)
+		if err != nil {
+			t.Errorf("p1 flip c1 failed: %v", err)
+		}
 
-		// Try to flip third card immediately (without processing next move)
-		err := b.Flip("player1", 2, 0)
-		if err == nil {
-			t.Error("Expected error when player tries to control third card")
+		// Step 2: p1 turns c2 (0,1 - B) - non-matching, should relinquish control
+		err = b.Flip("p1", 0, 1)
+		if err != nil {
+			t.Errorf("p1 flip c2 failed: %v", err)
+		}
+
+		// Give time for Rule 2-E processing (relinquish control)
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify p1 no longer controls cards but they remain face up
+		result := b.Look("p1")
+		if strings.Contains(result, "my A") || strings.Contains(result, "my B") {
+			t.Error("p1 should have relinquished control after non-matching cards")
+		}
+		if !strings.Contains(result, "up A") || !strings.Contains(result, "up B") {
+			t.Error("Cards should remain face up after mismatch (Rule 2-E)")
+		}
+
+		// Step 3: p2 turns c1 (0,0 - A) - Rule 1-C: takes control of face-up uncontrolled card
+		err = b.Flip("p2", 0, 0)
+		if err != nil {
+			t.Errorf("p2 should be able to take control of face-up uncontrolled card: %v", err)
+		}
+
+		// Step 4: p2 turns c2 (0,1 - B) - non-matching, should relinquish control
+		err = b.Flip("p2", 0, 1)
+		if err != nil {
+			t.Errorf("p2 flip c2 failed: %v", err)
+		}
+
+		// Give time for Rule 2-E processing
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify p2 no longer controls cards
+		result = b.Look("p2")
+		if strings.Contains(result, "my A") || strings.Contains(result, "my B") {
+			t.Error("p2 should have relinquished control after non-matching cards")
+		}
+
+		// Step 5: p1 turns c3 (1,0 - A)
+		err = b.Flip("p1", 1, 0)
+		if err != nil {
+			t.Errorf("p1 flip c3 failed: %v", err)
+		}
+
+		// Give time for Rule 3-B processing (previous face-up cards should turn face down)
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify that starting new move triggers Rule 3-B (previous cards turn face down)
+		result = b.Look("p1")
+		lines := strings.Split(strings.TrimSpace(result), "\n")
+
+		// Cards at positions (0,0) and (0,1) should now be face down due to Rule 3-B
+		if lines[1] != "down" || lines[2] != "down" {
+			t.Errorf("Previous non-matching cards should be face down after new move (Rule 3-B), got: %s, %s", lines[1], lines[2])
+		}
+
+		// p1 should control c3
+		if lines[3] != "my A" {
+			t.Errorf("p1 should control c3 (A), got: %s", lines[3])
+		}
+
+		// Step 6: p1 turns c4 (1,1 - B) - non-matching, should relinquish control
+		err = b.Flip("p1", 1, 1)
+		if err != nil {
+			t.Errorf("p1 flip c4 failed: %v", err)
+		}
+
+		// Give time for Rule 2-E processing
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify p1 relinquished control and cards remain face up
+		result = b.Look("p1")
+		if strings.Contains(result, "my A") || strings.Contains(result, "my B") {
+			t.Error("p1 should have relinquished control after c3-c4 mismatch")
+		}
+		lines = strings.Split(strings.TrimSpace(result), "\n")
+		if lines[3] != "up A" || lines[4] != "up B" {
+			t.Errorf("c3 and c4 should remain face up after mismatch, got: %s, %s", lines[3], lines[4])
+		}
+
+		// Step 7: p1 turns c1 (0,0 - A) again - should be face down now
+		err = b.Flip("p1", 0, 0)
+		if err != nil {
+			t.Errorf("p1 should be able to flip c1 again: %v", err)
+		}
+
+		// Give time for Rule 3-B processing (c3, c4 should turn face down)
+		time.Sleep(10 * time.Millisecond)
+
+		// Step 8: p1 turns c2 (0,1 - B) - should match and keep control
+		err = b.Flip("p1", 0, 1)
+		if err != nil {
+			t.Errorf("p1 flip c2 again failed: %v", err)
+		}
+
+		// Verify the match - both cards should be controlled by p1
+		result = b.Look("p1")
+		lines = strings.Split(strings.TrimSpace(result), "\n")
+
+		// This is non-matching (A and B), so p1 should relinquish control
+		if strings.Contains(result, "my A") || strings.Contains(result, "my B") {
+			t.Error("p1 should have relinquished control after A-B mismatch")
+		}
+
+		// Step 9: p2 turns c3 (1,0 - A) - should be face down due to Rule 3-B from p1's move
+		err = b.Flip("p2", 1, 0)
+		if err != nil {
+			t.Errorf("p2 should be able to flip c3: %v", err)
+		}
+
+		// Verify p2 controls c3
+		result = b.Look("p2")
+		lines = strings.Split(strings.TrimSpace(result), "\n")
+		if lines[3] != "my A" {
+			t.Errorf("p2 should control c3 (A), got: %s", lines[3])
 		}
 	})
 
@@ -628,7 +764,7 @@ func TestEdgeCases(t *testing.T) {
 	t.Run("Very large board", func(t *testing.T) {
 		// Create a larger board to test performance
 		content := "4x4\n"
-		for i := 0; i < 16; i++ {
+		for range 16 {
 			content += "A\n"
 		}
 
