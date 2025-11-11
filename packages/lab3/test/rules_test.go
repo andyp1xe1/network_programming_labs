@@ -389,6 +389,218 @@ func TestMemoryScrambleRuleEdgeCases(t *testing.T) {
 			t.Error("Player should have relinquished control per Rule 2-E")
 		}
 	})
+
+	// Test Rule 2-B + Rule 3-B interaction: When second card flip fails due to controlled card,
+	// first card should turn face down on next move (preventing players from seeing entire board)
+	t.Run("Rule 2-B failure should trigger Rule 3-B on next move", func(t *testing.T) {
+		content := "3x1\nA\nB\nC\n"
+		b := createTestBoardForRules(t, content)
+
+		// Player1 controls first card
+		err := b.Flip("player1", 0, 0) // A
+		if err != nil {
+			t.Fatalf("Player1 should be able to flip first card: %v", err)
+		}
+
+		// Player2 controls second card
+		err = b.Flip("player2", 1, 0) // B
+		if err != nil {
+			t.Fatalf("Player2 should be able to flip their card: %v", err)
+		}
+
+		// Player1 tries to flip Player2's controlled card as second card (should fail - Rule 2-B)
+		err = b.Flip("player1", 1, 0) // B (controlled by Player2)
+		if err == nil {
+			t.Error("Player1 should not be able to flip Player2's controlled card (Rule 2-B)")
+		}
+
+		// Verify Player1 lost control of first card (Rule 2-B)
+		result := b.Look("player1")
+		if strings.Contains(result, "my A") {
+			t.Error("Player1 should have relinquished control after Rule 2-B failure")
+		}
+
+		// First card should remain face up for now
+		if !strings.Contains(result, "up A") {
+			t.Error("First card should remain face up immediately after Rule 2-B failure")
+		}
+
+		// Player1 makes next move to trigger Rule 3-B processing
+		err = b.Flip("player1", 2, 0) // C
+		if err != nil {
+			t.Fatalf("Player1 should be able to make next move: %v", err)
+		}
+
+		// Give time for Rule 3-B processing
+		time.Sleep(10 * time.Millisecond)
+
+		// Now the first card (A) should be face down due to Rule 3-B
+		result = b.Look("player1")
+		lines := strings.Split(strings.TrimSpace(result), "\n")
+
+		if lines[1] != "down" {
+			t.Errorf("First card should be face down after Rule 3-B processing, got: %s", lines[1])
+		}
+
+		// Player2's card should still be controlled (not affected)
+		if !strings.Contains(lines[2], "up B") {
+			t.Error("Player2's card should still be face up and visible")
+		}
+
+		// Player1's new card should be controlled
+		if lines[3] != "my C" {
+			t.Errorf("Player1 should control new card C, got: %s", lines[3])
+		}
+	})
+
+	// Test Rule 2-E + Rule 2-B + Rule 3-B interaction: Complex scenario where player
+	// has non-matching cards, then tries controlled card as second card
+	t.Run("Rule 2-E then Rule 2-B should trigger Rule 3-B correctly", func(t *testing.T) {
+		content := "4x1\nA\nB\nC\nB\n"
+		b := createTestBoardForRules(t, content)
+
+		// Player2 controls one of the B cards to create controlled card scenario
+		err := b.Flip("player2", 1, 0) // B at position (1,0)
+		if err != nil {
+			t.Fatalf("Player2 should be able to flip their card: %v", err)
+		}
+
+		// Player1 sequence: A -> C (non-matching, Rule 2-E)
+		err = b.Flip("player1", 0, 0) // A
+		if err != nil {
+			t.Fatalf("Player1 should be able to flip first card: %v", err)
+		}
+
+		err = b.Flip("player1", 2, 0) // C (doesn't match A, triggers Rule 2-E)
+		if err != nil {
+			t.Fatalf("Player1 should be able to flip second card: %v", err)
+		}
+
+		// Give time for Rule 2-E processing
+		time.Sleep(10 * time.Millisecond)
+
+		// Verify Player1 lost control but cards remain face up (Rule 2-E)
+		result := b.Look("player1")
+		if strings.Contains(result, "my A") || strings.Contains(result, "my C") {
+			t.Error("Player1 should have relinquished control after Rule 2-E")
+		}
+		if !strings.Contains(result, "up A") || !strings.Contains(result, "up C") {
+			t.Error("Cards should remain face up after Rule 2-E mismatch")
+		}
+
+		// Player1 starts new sequence: C -> B (controlled by Player2)
+		// This should trigger Rule 3-B on previous cards (A, C) first, then try new sequence
+		err = b.Flip("player1", 2, 0) // C again as new first card
+		if err != nil {
+			t.Fatalf("Player1 should be able to flip new first card: %v", err)
+		}
+
+		// Give time for Rule 3-B processing of previous cards (A, C should turn face down)
+		time.Sleep(10 * time.Millisecond)
+
+		// Now try the controlled B card as second card (should fail Rule 2-B)
+		err = b.Flip("player1", 1, 0) // B at (1,0) - controlled by Player2
+		if err == nil {
+			t.Error("Should fail due to Rule 2-B (card controlled by Player2)")
+		}
+
+		// Verify Player1 lost control of C due to Rule 2-B failure
+		result = b.Look("player1")
+		if strings.Contains(result, "my C") {
+			t.Error("Player1 should have lost control of C after Rule 2-B failure")
+		}
+
+		// C should remain face up for now (similar to previous Rule 2-B behavior)
+		if !strings.Contains(result, "up C") {
+			t.Error("Card C should remain face up after Rule 2-B failure")
+		}
+
+		// Player1 makes next move to trigger Rule 3-B on C
+		err = b.Flip("player1", 3, 0) // B at (3,0) - different B card
+		if err != nil {
+			t.Fatalf("Player1 should be able to make next move: %v", err)
+		}
+
+		// Give time for Rule 3-B processing
+		time.Sleep(10 * time.Millisecond)
+
+		// Check that C is now face down due to Rule 3-B
+		result = b.Look("player1")
+		lines := strings.Split(strings.TrimSpace(result), "\n")
+
+		// Position (2,0) should be face down (C after Rule 3-B)
+		if lines[3] != "down" {
+			t.Errorf("Card C should be face down after Rule 3-B processing, got: %s", lines[3])
+		}
+
+		// The A card should also be face down from the earlier Rule 3-B processing
+		if lines[1] != "down" {
+			t.Errorf("Card A should be face down from earlier Rule 3-B processing, got: %s", lines[1])
+		}
+	})
+
+	// Test preventing board exploration through repeated Rule 2-B failures
+	t.Run("Rule 2-B failures should not allow full board exploration", func(t *testing.T) {
+		content := "4x1\nA\nB\nC\nD\n"
+		b := createTestBoardForRules(t, content)
+
+		// Player2 controls one card to create controlled card scenario
+		b.Flip("player2", 1, 0) // B
+
+		// Player1 tries to explore board using Rule 2-B failures
+		// This should NOT work - cards should turn face down preventing exploration
+
+		// Player1 flips first card
+		b.Flip("player1", 0, 0) // A
+
+		// Player1 tries controlled card (Rule 2-B failure)
+		err := b.Flip("player1", 1, 0) // B (controlled)
+		if err == nil {
+			t.Error("Should fail due to Rule 2-B")
+		}
+
+		// Player1 flips another first card (should trigger Rule 3-B on previous card)
+		b.Flip("player1", 2, 0) // C
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Try controlled card again (another Rule 2-B failure)
+		err = b.Flip("player1", 1, 0)
+		if err == nil {
+			t.Error("Should still fail due to Rule 2-B")
+		}
+
+		// Player1 flips yet another card
+		b.Flip("player1", 3, 0) // D
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Check that Player1 cannot see multiple cards face up
+		result := b.Look("player1")
+		lines := strings.Split(strings.TrimSpace(result), "\n")
+
+		faceUpCount := 0
+		controlledCount := 0
+		for i := 1; i < len(lines); i++ {
+			if strings.HasPrefix(lines[i], "up ") {
+				faceUpCount++
+			}
+			if strings.HasPrefix(lines[i], "my ") {
+				controlledCount++
+			}
+		}
+
+		// Player1 should not be able to see more than 2-3 cards face up at once
+		// (their current card + Player2's card + possibly one previous uncontrolled card)
+		if faceUpCount > 2 {
+			t.Errorf("Player1 should not see more than 2 face-up cards, saw %d face-up cards", faceUpCount)
+		}
+
+		// Player1 should only control their current card
+		if controlledCount > 1 {
+			t.Errorf("Player1 should only control 1 card, controls %d", controlledCount)
+		}
+	})
 }
 
 // Helper functions for rules tests
