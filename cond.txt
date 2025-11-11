@@ -40,7 +40,11 @@ You must use Python
 How to present
 Upload your project to GitHub and send me the URL in an email with the subject “PR lab 1” (artiom.balan@isa.utm.md). If you will be presenting later than the deadline, include the last commit hash so I can verify the time of the commit.
 Include a short report in the repository (markdown or a link to a Google doc). The report will be like a demo but with screenshots, so just include screenshots of everything you would need to show in the demo, each described with a short sentence: the commands you run, the outputs you see (browser, terminal). The report should prove that you satisfied all the requirements of the lab.
-You will present to me during seminars, defend your code, and answer a few theoretical questions. I will give priority to those who sent me an email first.
+You will present to me during seminars, defend your code, and answer a few theoretical questions. The answers to the questions are either true/false or a few words. You need to be able to explain your answer.
+Lab grading formula:
+Working program - 7 points
+Answered 2 questions (out of 3) - 2 points
+Code understanding - 1 point
 Docker
 You must use Docker Compose for all your laboratory works so that I can run them on my computer.
 The official Docker 101 tutorial is a good resource.
@@ -101,7 +105,7 @@ Parallelism and Concurrency are orthogonal
 A concurrent program may or may not execute in parallel
 A parallel computation may or may not have the notion of concurrency in its structure.
 As a consequence, the answer to “does parallel imply concurrent?” depends on the school of thought. As you will see, all the linked resources abide by the second school of thought. In general, the high-level view of concurrency is becoming more predominant, so it is important that you are aware of it and prove your understanding when answering the questions.
-To make it clear, if your answer is along the lines of “concurrency is a more general form of parallelism” or “concurrency is when tasks seemingly execute at the same time”, I will consider your answer wrong. You must at least mention the second definition.
+To make it clear, if your answer is along the lines of “concurrency is when tasks overlap in time” or “concurrency is when tasks seemingly execute at the same time”, I will consider your answer wrong. You must mention the second definition.
 The task
 In this lab, you will make your HTTP server multithreaded, so that it can handle multiple connections concurrently. You can either create a thread per request, or use a thread pool.
 To test it, write a script that makes multiple concurrent requests to your server. Add a delay to the request handler to simulate work (~1s), make 10 concurrent requests and measure the amount of time in which they are handled. Do the same with the single-threaded server from the previous lab. Compare the two.
@@ -110,14 +114,43 @@ Add a counter feature. Record the number of requests made to each file and show 
 First, implement it in a naive way and show that there is a race condition (you can rewrite the code and add delays to force interlacing of threads). Then, use a synchronization mechanism (e.g. a lock) and show that the race condition is gone.
 Rate limiting: 2 points
 Implement rate limiting by client IP (~5 requests/second) in a thread-safe way. Have one friend spam you with requests and another send requests just below the rate limit. Compare the throughput for both (successful requests/second).
-Lab 3
+Report
+There are three parts in this lab. Include screenshots for each item. 
+Performance comparison between the two servers
+Show how you send 10 requests to the single-threaded server and how long it takes
+Show how you send 10 requests to the multi-threaded server and how long it takes
+Hit counter and race condition
+Show how you trigger a race condition
+Show the code responsible for it (max. 4 lines)
+Show the fixed code
+Rate limiting
+Show how you spam requests (specify Requests/second)
+Show the responses statistics (successful R/s, denied R/s)
+Show how it is aware of IPs (spam requests from another IP, and show how another IP still can send requests successfully)
+Lab 3: Multiplayer Game
+For this lab you will implement the MIT 6.102 (2025) Memory Scramble lab.
+You can find the starter code that they provide to the students in this Github repo.
+You are free to use any HTTP and unit test libraries.
+Structure of your implementation
+The provided skeleton (in TypeScript) already implements the web API server, your job remains to implement the Board ADT and complete the functions in “commands.ts” by calling your Board’s methods. 
+You may use any language you want. However, you must still follow the structure imposed in the requirements and in the skeleton. Basically, you should convert the provided skeleton to your language of choice and go from there. More explicitly, you must retain the following structure:
+A mutable Board ADT with defined rep invariants and a checkRep() function
+A “commands” module implementing the given specification 
+An HTTP API that only calls the functions from the “commands” module (it can’t call the Board’s methods directly)
+Grading
+Implementation:
+(10 points) The game works correctly according to all the rules
+(10 points) You have unit tests for the Board ADT covering all the rules, the tests are readable and documented (and passing)
+(4 points) You have a script that simulates multiple players making random moves with random timeouts. The goal is to check that the game never crashes (and it doesn’t). Requirements: 4 players, timeouts between 0.1ms and 2ms, no shuffling, 100 moves each.
+Design and documentation:
+(6 points) You followed the required structure of the modules (especially the “commands” module)
+(6 points) Representation invariants, safety from rep exposure arguments, for every ADT
+(8 points) Specifications for every method (function signature, preconditions, postconditions)
+Deadline and presentation:
+20 points if you present before November 15, minus 5 for every week after that
+(12 points) you understand how it all works
+Lab 4
 Work in progress
-Lab 4: Multiplayer Game
-Work in progress
-You will implement the MIT 6.102 (2025) Memory Scramble lab.
-A multiplayer game is a great lab for a PR course because it teaches important concepts in a fun way:
-Concurrency
-Implementing a Web API
 Curriculum
 Here is the list of topics that will be covered in this course:
 Concurrency
@@ -159,3 +192,5 @@ A terse and elegant overview of concurrency (independence) and concurrency parad
 A comprehensive book on the concepts of concurrency: “The Art of Multiprocessor Programming” (2008) (multiprocessor = multi-core):
 Theoretical (Mutual Exclusion)
 Practical (Locks, Monitors)
+
+
