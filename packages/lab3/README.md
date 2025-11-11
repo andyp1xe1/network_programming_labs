@@ -115,9 +115,9 @@ Replaces all instances of `fromCard` with `toCard` content across the entire boa
 ```http
 GET /restart
 ```
-Resets board to initial state with all cards face-down and no player control.
+Completely resets board to initial state by reloading from the original board file - equivalent to restarting the program. Restores removed cards, clears all player states, and resets all game progress.
 - **Response**: "restarted" confirmation message
-- **Status Codes**: 200 (success), 500 (server error)
+- **Status Codes**: 200 (success), 500 (file read error)
 
 ### Response Formats
 

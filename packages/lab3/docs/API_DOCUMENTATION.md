@@ -48,7 +48,7 @@ The **commands** module serves as the required intermediate layer between the HT
 
 #### Abstraction Function
 ```
-AF(cards, rows, cols, players, mutex, version, watchers, watchMutex) = 
+AF(cards, rows, cols, players, mutex, version, watchers, watchMutex, filename) = 
   A Memory Scramble game board representing a rows×cols grid where:
   - cards[r][c] represents the card at position (r,c), or nil if empty
   - players maps player IDs to their current game state and controlled positions  
@@ -56,11 +56,12 @@ AF(cards, rows, cols, players, mutex, version, watchers, watchMutex) =
   - version tracks board changes for efficient watcher notifications
   - watchers maps player IDs to channels for real-time update delivery
   - watchMutex protects concurrent watcher registration/removal
+  - filename stores the original board file path for restart functionality
 ```
 
 #### Representation Invariant
 ```
-RI(cards, rows, cols, players, mutex, version, watchers, watchMutex) = 
+RI(cards, rows, cols, players, mutex, version, watchers, watchMutex, filename) = 
   cards != null ∧ len(cards) = rows ∧
   (∀i ∈ [0, rows): len(cards[i]) = cols) ∧
   (∀r,c: cards[r][c] = nil ⟺ no card at position (r,c)) ∧
@@ -75,13 +76,14 @@ RI(cards, rows, cols, players, mutex, version, watchers, watchMutex) =
     (∀pos ∈ p.PreviousCards: 0 ≤ pos.Row < rows ∧ 0 ≤ pos.Col < cols)) ∧
   (∀pos: |{p ∈ players | pos ∈ p.ControlledPos}| ≤ 1) ∧
   version > 0 ∧
-  (∀playerID ∈ watchers: ∀ch ∈ watchers[playerID]: ch != nil)
+  (∀playerID ∈ watchers: ∀ch ∈ watchers[playerID]: ch != nil) ∧
+  filename != "" ∧ filename represents a valid file path
 ```
 
 #### Safety from Rep Exposure
 The Board ADT prevents representation exposure through the following mechanisms:
 
-1. **Private Fields**: All representation fields (`cards`, `players`, `mutex`, etc.) are unexported
+1. **Private Fields**: All representation fields (`cards`, `players`, `mutex`, `filename`, etc.) are unexported
 2. **Defensive Copying**: 
    - `Look()` method constructs new strings rather than exposing card array
    - Position structs are passed by value, not reference  
@@ -146,8 +148,8 @@ RI(Card) = Content != ""
 func ParseFromFile(filename string) (*Board, error)
 ```
 **Requires:** `filename` refers to a readable file with valid board format  
-**Effects:** Creates new Board instance from file contents  
-**Returns:** New Board with cards initialized face-down, or error if file invalid  
+**Effects:** Creates new Board instance from file contents and stores filename for restart functionality  
+**Returns:** New Board with cards initialized face-down and filename field set, or error if file invalid  
 **Format:** First line "ROWxCOL", followed by ROW×COL lines of card content
 
 #### Look  
@@ -196,11 +198,16 @@ func (b *Board) ReplaceCard(fromCard, toCard string) error
 ```go  
 func (b *Board) Restart() error
 ```
-**Requires:** None  
-**Effects:** Resets all cards to face-down, clears all player states and watchers  
-**Modifies:** All card FaceUp states, all PlayerState fields, watchers map, version  
-**Returns:** Always nil (no error conditions)  
-**Thread Safety:** Uses both mutex locks for complete state reset
+**Requires:** `b.filename` must represent a valid, readable file path  
+**Effects:** Completely resets board to initial state by reloading from original file - equivalent to program restart  
+**Modifies:** 
+- Closes all existing watchers and creates fresh watchers map
+- Reloads entire card array from `b.filename` (restores removed cards)
+- Clears all player states completely (creates fresh players map)
+- Resets board version to 1
+- Preserves original filename for future restarts
+**Returns:** Error if file cannot be read, nil if successful  
+**Thread Safety:** Uses both mutex locks for atomic complete state replacement
 
 #### Watch
 ```go

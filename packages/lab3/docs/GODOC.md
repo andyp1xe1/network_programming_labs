@@ -86,8 +86,8 @@ func ParseFromFile(filename string) (*Board, error)
 ```
 **Specification:**
 - **Requires:** filename refers to a readable file with valid board format
-- **Effects:** Creates new Board instance from file contents with all cards face-down
-- **Returns:** New Board with initialized game state, or error if file invalid  
+- **Effects:** Creates new Board instance from file contents with all cards face-down and stores filename for restart functionality
+- **Returns:** New Board with initialized game state and filename field set, or error if file invalid  
 - **Format:** First line "ROWxCOL", followed by ROW×COL lines of card content
 
 #### Flip  
@@ -131,11 +131,16 @@ func (b *Board) ReplaceCard(fromCard, toCard string) error
 func (b *Board) Restart() error
 ```
 **Specification:**
-- **Requires:** None
-- **Effects:** Resets all cards to face-down, clears all player states and watchers
-- **Modifies:** All card FaceUp states, all PlayerState fields, watchers map, version
-- **Returns:** Always nil (no error conditions)
-- **Thread Safety:** Uses both mutex locks for complete state reset
+- **Requires:** b.filename must represent a valid, readable file path
+- **Effects:** Completely resets board to initial state by reloading from original file - equivalent to program restart
+- **Modifies:** 
+  - Closes all existing watchers and creates fresh watchers map
+  - Reloads entire card array from b.filename (restores removed cards)
+  - Clears all player states completely (creates fresh players map)
+  - Resets board version to 1
+  - Preserves original filename for future restarts
+- **Returns:** Error if file cannot be read, nil if successful
+- **Thread Safety:** Uses both mutex locks for atomic complete state replacement
 
 #### String
 ```go
@@ -274,9 +279,9 @@ func Replace(playerID, fromCard, toCard string) (string, error)
 func Restart() (string, error)
 ```
 **Specification:**
-- **Requires:** gameBoard != nil
-- **Effects:** Delegates to gameBoard.Restart()
-- **Returns:** "restarted" confirmation or initialization error
+- **Requires:** gameBoard != nil, original board file must still be readable
+- **Effects:** Delegates to gameBoard.Restart() - completely reloads board from original file
+- **Returns:** "restarted" confirmation if successful, or file read error
 
 #### Watch
 ```go
