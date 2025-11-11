@@ -2,6 +2,19 @@
 
 .PHONY: help dev server client stop build clean test logs status downloads
 
+help:
+	@echo "HTTP File Server - Available Commands:"
+	@echo "  dev        - Start development server with file watching"
+	@echo "  server     - Start HTTP server in background"
+	@echo "  client     - Run client (set HOST, PORT, FILE, DIR)"
+	@echo "  stop       - Stop all services"
+	@echo "  build      - Build Docker images"
+	@echo "  clean      - Clean all containers, images, and downloads"
+	@echo "  test       - Run full test suite"
+	@echo "  logs       - Show server logs"
+	@echo "  status     - Show container status"
+	@echo "  downloads  - List downloaded files"
+
 dev:
 	docker-compose watch
 
