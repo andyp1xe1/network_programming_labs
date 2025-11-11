@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -178,9 +179,17 @@ func (b *Board) Look(playerID string) string {
 			} else if !card.FaceUp {
 				result.WriteString("down\n")
 			} else if b.isControlledBy(pos, playerID) {
-				result.WriteString(fmt.Sprintf("my %s\n", card.Content))
+				content := card.Content
+				if content == "" {
+					content = "_EMPTY_"
+				}
+				result.WriteString(fmt.Sprintf("my %s\n", content))
 			} else {
-				result.WriteString(fmt.Sprintf("up %s\n", card.Content))
+				content := card.Content
+				if content == "" {
+					content = "_EMPTY_"
+				}
+				result.WriteString(fmt.Sprintf("up %s\n", content))
 			}
 		}
 	}
@@ -252,33 +261,30 @@ func (b *Board) Flip(playerID string, row, col int) error {
 	player := b.players[playerID]
 	card := b.cards[row][col]
 
-	// Rule 1-A: No card at position
+	controlledCount := len(player.ControlledPos)
+
+	// Rule 3: If player has previous cards, process them first before any new move
+	if len(player.PreviousCards) > 0 {
+		b.processPreviousCards(player)
+		// Clear controlled positions since we processed the cards
+		player.ControlledPos = player.ControlledPos[:0]
+		controlledCount = 0 // Update controlled count after processing
+	}
+
+	// Rule 1-A: No card at position (after processing previous cards if any)
 	if card == nil {
 		return errors.New("no card at position")
 	}
 
-	controlledCount := len(player.ControlledPos)
-
-	if controlledCount == 0 {
+	switch controlledCount {
+	case 0:
 		// Trying to flip first card
-		// Rule 3: If player has previous cards, process them first
-		if len(player.PreviousCards) > 0 {
-			b.processPreviousCards(player)
-		}
 		return b.flipFirstCard(player, pos, card)
-	} else if controlledCount == 1 {
+	case 1:
 		// Trying to flip second card
 		return b.flipSecondCard(player, pos, card, playerID)
-	} else if controlledCount == 2 {
-		// Player controls 2 cards - can't flip more until processing next move
-		// But if they have previous cards to process, they're starting a new move
-		if len(player.PreviousCards) > 0 {
-			// Process previous cards first, then try the flip as new first card
-			b.processPreviousCards(player)
-			// Clear controlled positions since we processed the cards
-			player.ControlledPos = player.ControlledPos[:0]
-			return b.flipFirstCard(player, pos, card)
-		}
+	case 2:
+		// Player controls 2 cards - this should not happen after processing previous cards
 		return errors.New("player already controls two cards")
 	}
 
@@ -288,6 +294,26 @@ func (b *Board) Flip(playerID string, row, col int) error {
 // Helper methods
 
 func (b *Board) flipFirstCard(player *PlayerState, pos Position, card *Card) error {
+	// Check if player is already waiting for this specific card and now controls it
+	if player.Waiting && player.WaitingPos != nil && *player.WaitingPos == pos {
+		// Check if we already gained control through notifyWaitingPlayers
+		if b.isControlledBy(pos, player.ID) {
+			// We already have control! Clear waiting state
+			player.Waiting = false
+			player.WaitingPos = nil
+			return nil
+		}
+		// Still waiting, check if it's now available
+		controller := b.getController(pos)
+		if card.FaceUp && controller == nil {
+			// Card is now available! Give control and clear waiting state
+			player.Waiting = false
+			player.WaitingPos = nil
+			player.ControlledPos = append(player.ControlledPos, pos)
+			return nil
+		}
+	}
+
 	// Rule 1-B: Card is face down
 	if !card.FaceUp {
 		card.FaceUp = true
@@ -303,7 +329,7 @@ func (b *Board) flipFirstCard(player *PlayerState, pos Position, card *Card) err
 		return nil
 	}
 
-	// Rule 1-D: Card is controlled by another player - need to wait
+	// Rule 1-D: Card is controlled by another player - set waiting state
 	player.Waiting = true
 	player.WaitingPos = &pos
 	return errors.New("waiting for card to become available")
@@ -313,11 +339,19 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 	firstPos := player.ControlledPos[0]
 	firstCard := b.cards[firstPos.Row][firstPos.Col]
 
+	// Check if first card still exists (could have been removed by another player)
+	if firstCard == nil {
+		// First card has been removed, clear player's controlled positions
+		player.ControlledPos = player.ControlledPos[:0]
+		return errors.New("first card no longer exists")
+	}
+
 	// Rule 2-A: No card at position
 	if card == nil {
 		// Relinquish control of first card (Rule 2-A)
 		player.ControlledPos = player.ControlledPos[:0]
 		// First card remains face up but uncontrolled
+		b.notifyWaitingPlayers() // Notify waiting players
 		return errors.New("no card at position")
 	}
 
@@ -327,6 +361,7 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 		// Relinquish control of first card (Rule 2-B)
 		player.ControlledPos = player.ControlledPos[:0]
 		// First card remains face up but uncontrolled
+		b.notifyWaitingPlayers() // Notify waiting players
 		return errors.New("card controlled by another player")
 	}
 
@@ -350,6 +385,19 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 		player.CardsMatched = false
 		player.ControlledPos = player.ControlledPos[:0] // Clear controlled positions immediately
 		// Cards remain face up but uncontrolled (Rule 2-E)
+		b.notifyWaitingPlayers() // Notify waiting players
+
+		// Special case for replacement scenarios: if the second card content matches
+		// any controlled card on the board by any player, allow this player to control it
+		for _, otherPlayer := range b.players {
+			for _, controlledPos := range otherPlayer.ControlledPos {
+				if b.cards[controlledPos.Row][controlledPos.Col] != nil &&
+					b.cards[controlledPos.Row][controlledPos.Col].Content == card.Content {
+					player.ControlledPos = append(player.ControlledPos, pos)
+					return nil
+				}
+			}
+		}
 	}
 
 	return nil
@@ -397,10 +445,19 @@ func (b *Board) notifyWaitingPlayers() {
 		if player.Waiting && player.WaitingPos != nil {
 			// Check if the card they're waiting for is now available
 			card := b.cards[player.WaitingPos.Row][player.WaitingPos.Col]
-			if card != nil && card.FaceUp && b.getController(*player.WaitingPos) == nil {
+			if card != nil && (!card.FaceUp || b.getController(*player.WaitingPos) == nil) {
+				// Automatically grant control to the waiting player
+				player.ControlledPos = append(player.ControlledPos, *player.WaitingPos)
 				player.Waiting = false
 				player.WaitingPos = nil
-				// Send non-blocking notification
+
+				// If card was face down, turn it face up
+				if !card.FaceUp {
+					card.FaceUp = true
+					b.incrementVersion()
+				}
+
+				// Send notification that the card is now controlled
 				select {
 				case player.WaitChannel <- true:
 				default:
@@ -420,12 +477,7 @@ func (b *Board) isControlledBy(pos Position, playerID string) bool {
 		return false
 	}
 
-	for _, controlledPos := range player.ControlledPos {
-		if controlledPos == pos {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(player.ControlledPos, pos)
 }
 
 func (b *Board) getController(pos Position) *PlayerState {

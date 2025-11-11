@@ -796,16 +796,20 @@ func TestEdgeCases(t *testing.T) {
 			t.Error("Cards should remain face up after mismatch (Rule 2-E)")
 		}
 
-		// Step 4: Either Bob or Charlie should now be able to control the red heart - Rule 1-C
-		// Let's say Bob gets it
-		err = b.Flip("bob", 0, 0)
-		if err != nil {
-			t.Errorf("Bob should be able to take control of face-up uncontrolled card: %v", err)
+		// Step 4: Either Bob or Charlie should now automatically have control - one of the waiters gets it
+		// Check that either Bob or Charlie now controls the red heart (automatic control transfer)
+		bobResult := b.Look("bob")
+		charlieResult := b.Look("charlie")
+
+		bobHasControl := strings.Contains(bobResult, "my ❤️")
+		charlieHasControl := strings.Contains(charlieResult, "my ❤️")
+
+		if !bobHasControl && !charlieHasControl {
+			t.Error("Either Bob or Charlie should automatically have control of the red heart after Alice released it")
 		}
 
-		result = b.Look("bob")
-		if !strings.Contains(result, "my ❤️") {
-			t.Error("Bob should now control the red heart")
+		if bobHasControl && charlieHasControl {
+			t.Error("Only one player should control the red heart, not both")
 		}
 
 		// Step 5: Alice starts a new move by flipping center card (1,1 - 💛) - Rule 3-B applies
@@ -817,13 +821,13 @@ func TestEdgeCases(t *testing.T) {
 		// Give time for Rule 3-B processing
 		time.Sleep(10 * time.Millisecond)
 
-		// The purple heart should now be face down (Rule 3-B), but red heart stays up (controlled by Bob)
+		// The purple heart should now be face down (Rule 3-B), but red heart stays up (controlled by whoever got it)
 		result = b.Look("alice")
 		lines := strings.Split(strings.TrimSpace(result), "\n")
 
-		// Position (0,0) should still show "up ❤️" (controlled by Bob)
+		// Position (0,0) should still show "up ❤️" (controlled by either Bob or Charlie)
 		if !strings.Contains(lines[1], "up ❤️") {
-			t.Error("Red heart should still be face up (controlled by Bob)")
+			t.Error("Red heart should still be face up (controlled by waiting player who got it)")
 		}
 
 		// Position (2,2) should now be "down" (Rule 3-B - was face up but uncontrolled)
