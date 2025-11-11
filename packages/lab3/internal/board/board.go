@@ -509,10 +509,12 @@ func (b *Board) notifyWaitingPlayers() {
 	}
 }
 
+// isValidPosition checks if the given position is within board boundaries.
 func (b *Board) isValidPosition(pos Position) bool {
 	return pos.Row >= 0 && pos.Row < b.rows && pos.Col >= 0 && pos.Col < b.cols
 }
 
+// isControlledBy checks if the given position is controlled by the specified player.
 func (b *Board) isControlledBy(pos Position, playerID string) bool {
 	player := b.players[playerID]
 	if player == nil {
@@ -522,6 +524,7 @@ func (b *Board) isControlledBy(pos Position, playerID string) bool {
 	return slices.Contains(player.ControlledPos, pos)
 }
 
+// getController returns the player who controls the given position, or nil if uncontrolled.
 func (b *Board) getController(pos Position) *PlayerState {
 	for _, player := range b.players {
 		if b.isControlledBy(pos, player.ID) {
@@ -531,6 +534,7 @@ func (b *Board) getController(pos Position) *PlayerState {
 	return nil
 }
 
+// checkRep verifies the representation invariant.
 func (b *Board) checkRep() {
 	// Verify cards array is rectangular
 	if len(b.cards) != b.rows {
@@ -679,6 +683,7 @@ func (b *Board) Watch(playerID string) (string, error) {
 	}
 }
 
+// String returns a human-readable representation of the board state.
 func (b *Board) String() string {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
