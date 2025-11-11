@@ -1,4 +1,7 @@
-// Package commands provides the API layer for Memory Scramble game operations
+// Package commands provides the API layer for Memory Scramble game operations.
+//
+// Acts as the interface between HTTP server and board ADT, handling
+// parameter validation and coordinate conversion.
 package commands
 
 import (
@@ -11,13 +14,12 @@ import (
 
 var gameBoard *board.Board
 
-// SetBoard sets the global game board instance
+// SetBoard sets the global game board instance.
 func SetBoard(b *board.Board) {
 	gameBoard = b
 }
 
-// Look returns the current state of the board from the specified player's perspective
-// Returns board state in the format: ROWxCOL\n followed by card states
+// Look returns the current board state from the specified player's perspective.
 func Look(playerID string) (string, error) {
 	if gameBoard == nil {
 		return "", errors.New("board not initialized")
@@ -25,9 +27,8 @@ func Look(playerID string) (string, error) {
 	return gameBoard.Look(playerID), nil
 }
 
-// Flip attempts to flip a card at the given position for the specified player
-// position should be in format "row,col"
-// Returns updated board state on success, error on failure
+// Flip attempts to flip a card at the given position for the specified player.
+// Position should be in format "row,col".
 func Flip(playerID, position string) (string, error) {
 	if gameBoard == nil {
 		return "", errors.New("board not initialized")
@@ -59,8 +60,7 @@ func Flip(playerID, position string) (string, error) {
 	return gameBoard.Look(playerID), nil
 }
 
-// Replace applies a transformation to replace all instances of fromCard with toCard
-// This is the map operation from the MIT specification
+// Replace replaces all instances of fromCard with toCard.
 func Replace(playerID, fromCard, toCard string) (string, error) {
 	if gameBoard == nil {
 		return "", errors.New("board not initialized")
@@ -74,8 +74,7 @@ func Replace(playerID, fromCard, toCard string) (string, error) {
 	return gameBoard.Look(playerID), nil
 }
 
-// Watch waits for the next change to the board and returns the updated state
-// This implements the long-polling functionality
+// Watch waits for the next board change and returns the updated state.
 func Watch(playerID string) (string, error) {
 	if gameBoard == nil {
 		return "", errors.New("board not initialized")
@@ -84,7 +83,7 @@ func Watch(playerID string) (string, error) {
 	return gameBoard.Watch(playerID)
 }
 
-// Restart resets the board to initial state
+// Restart resets the board to its initial state.
 func Restart() (string, error) {
 	if gameBoard == nil {
 		return "", errors.New("board not initialized")

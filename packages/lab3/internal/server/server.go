@@ -1,4 +1,6 @@
-// Package server provides HTTP server for Memory Scramble game
+// Package server provides HTTP server for Memory Scramble game.
+//
+// Handles HTTP routing, CORS headers, and request/response processing.
 package server
 
 import (
@@ -11,13 +13,13 @@ import (
 	"lab3/internal/commands"
 )
 
-// Server represents the HTTP server for Memory Scramble
+// Server represents the HTTP server for Memory Scramble.
 type Server struct {
 	board *board.Board
 	mux   *http.ServeMux
 }
 
-// New creates a new server instance with the given board
+// New creates a new server instance with the given board.
 func New(b *board.Board) *Server {
 	s := &Server{
 		board: b,
@@ -33,7 +35,7 @@ func New(b *board.Board) *Server {
 	return s
 }
 
-// Start starts the HTTP server on the given address
+// Start starts the HTTP server on the given address.
 func (s *Server) Start(addr string) error {
 	return http.ListenAndServe(addr, s.mux)
 }

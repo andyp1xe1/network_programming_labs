@@ -1,4 +1,10 @@
-// Package board implements the Memory Scramble game board ADT
+// Package board implements the Memory Scramble game board ADT.
+//
+// Provides thread-safe operations for multi-player card matching games
+// following MIT 6.102 Problem Set 4 specification.
+//
+// See docs/API_DOCUMENTATION.md for complete ADT specifications including
+// representation invariants and safety from rep exposure arguments.
 package board
 
 import (
@@ -43,30 +49,12 @@ type Position struct {
 	Row, Col int
 }
 
-// Board represents the Memory Scramble game board
+// Board represents the Memory Scramble game board.
 //
-// Abstraction Function:
+// Provides thread-safe concurrent operations for multiple players.
+// Zero value is not usable; create boards using ParseFromFile.
 //
-//	AF(cards, players, mutex) = A Memory Scramble game board where:
-//	- cards[r][c] represents the card at position (r,c), or nil if empty
-//	- players maps player IDs to their current game state
-//	- mutex protects concurrent access to the board state
-//
-// Representation Invariant:
-//   - cards is a rectangular 2D array (all rows have same length)
-//   - cards[r][c] is nil iff there is no card at position (r,c)
-//   - For each player in players:
-//   - All positions in ControlledPos are valid board positions
-//   - All positions in ControlledPos have non-nil cards that are face-up
-//   - If Waiting is true, WaitingPos is a valid position with a face-up card controlled by another player
-//   - No card is controlled by more than one player
-//   - A player controls at most 2 cards at any time
-//
-// Safety from Rep Exposure:
-//   - cards array is never returned directly; only copies of card contents are returned
-//   - players map is never exposed; only individual player states are accessed
-//   - All public methods use mutex to ensure thread safety
-//   - Position structs are passed by value
+// See docs/API_DOCUMENTATION.md for complete ADT specifications.
 type Board struct {
 	cards      [][]*Card
 	rows       int
@@ -78,8 +66,10 @@ type Board struct {
 	watchMutex sync.RWMutex             // Separate mutex for watchers
 }
 
-// ParseFromFile creates a new board by parsing the given file
-// The file format is: ROWxCOLUMN\n followed by ROW*COLUMN lines with card content
+// ParseFromFile creates a new board by parsing the given file.
+//
+// File format: "ROWxCOL" on first line, followed by ROW*COL lines of card content.
+// Returns an error if file format is invalid.
 func ParseFromFile(filename string) (*Board, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -154,7 +144,7 @@ func ParseFromFile(filename string) (*Board, error) {
 	return board, nil
 }
 
-// Look returns the current state of the board from the specified player's perspective
+// Look returns the current board state from the specified player's perspective.
 func (b *Board) Look(playerID string) string {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
@@ -196,8 +186,8 @@ func (b *Board) Look(playerID string) string {
 	return result.String()
 }
 
-// WaitForCard waits for a card to become available for the specified player
-// Returns true if card becomes available, false if timeout
+// WaitForCard waits for a card to become available for the specified player.
+// Returns true if card becomes available, false if timeout.
 func (b *Board) WaitForCard(playerID string, row, col int) bool {
 	b.mutex.Lock()
 	player := b.players[playerID]
@@ -231,8 +221,8 @@ func (b *Board) WaitForCard(playerID string, row, col int) bool {
 	}
 }
 
-// Flip attempts to flip a card at the given position for the specified player
-// Returns an error if the flip is invalid according to the game rules
+// Flip attempts to flip a card at the given position for the specified player.
+// Returns an error if the flip violates game rules.
 func (b *Board) Flip(playerID string, row, col int) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
