@@ -61,7 +61,7 @@ AF(cards, players, mutex) = A Memory Scramble game board where:
 
 **Representation Invariant:**
 - cards is a rectangular 2D array (all rows have same length)
-- cards[r][c] is nil iff there is no card at position (r,c)
+- `cards[r][c]` is nil iff there is no card at position (r,c)
 - For each player in players:
   - All positions in ControlledPos are valid board positions
   - All positions in ControlledPos have non-nil cards that are face-up
