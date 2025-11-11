@@ -64,21 +64,22 @@ AF(cards, rows, cols, players, mutex, version, watchers, watchMutex, filename) =
 RI(cards, rows, cols, players, mutex, version, watchers, watchMutex, filename) = 
   cards != null ∧ len(cards) = rows ∧
   (∀i ∈ [0, rows): len(cards[i]) = cols) ∧
-  (∀r,c: cards[r][c] = nil ⟺ no card at position (r,c)) ∧
+  filename != "" ∧
   (∀p ∈ players: 
-    p.ID != "" ∧
     len(p.ControlledPos) ≤ 2 ∧
     (∀pos ∈ p.ControlledPos: 
       0 ≤ pos.Row < rows ∧ 0 ≤ pos.Col < cols ∧
       cards[pos.Row][pos.Col] != nil ∧
-      cards[pos.Row][pos.Col].FaceUp = true) ∧
-    (p.Waiting = true ⟹ p.WaitingPos != nil ∧ p.WaitChannel != nil) ∧
-    (∀pos ∈ p.PreviousCards: 0 ≤ pos.Row < rows ∧ 0 ≤ pos.Col < cols)) ∧
-  (∀pos: |{p ∈ players | pos ∈ p.ControlledPos}| ≤ 1) ∧
-  version > 0 ∧
-  (∀playerID ∈ watchers: ∀ch ∈ watchers[playerID]: ch != nil) ∧
-  filename != "" ∧ filename represents a valid file path
+      cards[pos.Row][pos.Col].FaceUp = true)) ∧
+  (∀pos: |{p ∈ players | pos ∈ p.ControlledPos}| ≤ 1)
 ```
+
+**Note**: The above invariants are actively checked by `checkRep()`. Additional logical 
+invariants exist but are not programmatically verified:
+- `version > 0` and increments on changes  
+- Watcher channels are non-nil when created
+- Player IDs are non-empty strings
+- PreviousCards contains valid positions from completed moves
 
 #### Safety from Rep Exposure
 The Board ADT prevents representation exposure through the following mechanisms:
@@ -119,10 +120,10 @@ RI(PlayerState) =
   ID != "" ∧
   len(ControlledPos) ≤ 2 ∧
   len(PreviousCards) ≤ 2 ∧
-  (Waiting = true ⟹ WaitingPos != nil ∧ WaitChannel != nil) ∧
-  (Waiting = false ⟹ WaitingPos = nil) ∧
+  (Waiting = true ⟹ WaitingPos != nil) ∧
   WaitChannel != nil
 ```
+Note: WaitingPos may be non-nil when Waiting = false (not enforced by checkRep)
 
 ### Card ADT  
 
@@ -136,8 +137,9 @@ type Card struct {
 
 #### Representation Invariant
 ```
-RI(Card) = Content != ""
+RI(Card) = true
 ```
+(No constraints on Content - empty strings are allowed via ReplaceCard)
 
 ## Method Specifications
 

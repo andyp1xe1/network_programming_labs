@@ -59,18 +59,19 @@ AF(cards, players, mutex) = A Memory Scramble game board where:
 - mutex protects concurrent access to the board state
 ```
 
-**Representation Invariant:**
+**Representation Invariant (verified by checkRep):**
 - cards is a rectangular 2D array (all rows have same length)
-- `cards[r][c]` is nil iff there is no card at position (r,c)
+- filename is not empty
 - For each player in players:
-  - All positions in ControlledPos are valid board positions
-  - All positions in ControlledPos have non-nil cards that are face-up
-  - All positions in PreviousCards are valid board positions from completed moves
-  - CardsMatched is true iff PreviousCards contains matching card contents
-  - If Waiting is true, WaitingPos is a valid position with a face-up card controlled by another player
-  - No card is controlled by more than one player
   - A player controls at most 2 cards at any time
-  - PreviousCards contains at most 2 positions from the most recent completed move
+  - All positions in ControlledPos are valid board positions  
+  - All positions in ControlledPos have non-nil cards that are face-up
+  - No two players control the same position
+
+**Additional Logical Invariants (not programmatically checked):**
+- All positions in PreviousCards are valid board positions from completed moves
+- CardsMatched is true iff PreviousCards contains matching card contents
+- Cards may have empty content (allowed via ReplaceCard operations)
 
 **Safety from Rep Exposure:**
 - cards array is never returned directly; only copies of card contents are returned
@@ -182,7 +183,7 @@ type Card struct {
     FaceUp  bool
 }
 ```
-Card represents a card with its content.
+Card represents a card with its content. Content may be empty (via ReplaceCard operations).
 
 #### type CardStatus
 

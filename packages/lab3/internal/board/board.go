@@ -546,6 +546,11 @@ func (b *Board) checkRep() {
 		}
 	}
 
+	// Verify filename is set
+	if b.filename == "" {
+		panic("filename is empty")
+	}
+
 	// Verify player states
 	for _, player := range b.players {
 		if len(player.ControlledPos) > 2 {
@@ -559,6 +564,19 @@ func (b *Board) checkRep() {
 			card := b.cards[pos.Row][pos.Col]
 			if card == nil || !card.FaceUp {
 				panic("player controls non-existent or face-down card")
+			}
+		}
+
+		// Verify no two players control the same position
+		for otherID, otherPlayer := range b.players {
+			if otherID != player.ID {
+				for _, pos := range player.ControlledPos {
+					for _, otherPos := range otherPlayer.ControlledPos {
+						if pos == otherPos {
+							panic("multiple players control same position")
+						}
+					}
+				}
 			}
 		}
 	}
