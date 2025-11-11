@@ -13,13 +13,23 @@ lab3/
 │   │   └── commands.go     # HTTP command interface to board operations
 │   └── server/             # HTTP server implementation
 │       └── server.go       # Web server with CORS and routing
-├── test/
-│   └── board_test.go       # Comprehensive test suite (43 test cases)
-├── cmd/simulation/         # Simulation and testing utilities
-│   └── main.go             # Game simulation script
+├── test/                      # Comprehensive test suite (140+ test cases)
+│   ├── board_test.go       # Basic board functionality tests
+│   ├── rules_test.go       # MIT 6.102 rule compliance tests  
+│   ├── advanced_features_test.go # Complex game scenarios
+│   ├── concurrency_test.go # Multi-player thread safety tests
+│   ├── commands_test.go    # API command layer tests
+│   ├── scenarios_test.go   # End-to-end gameplay scenarios
+│   └── bug_test.go         # Regression tests for discovered bugs
+├── cmd/simulation/         # Course requirement simulation
+│   └── main.go             # 4-player, 100-moves-each simulation script
+├── docs/                      # Project documentation
+│   ├── API_DOCUMENTATION.md # Complete API specifications  
+│   ├── GODOC.md            # Go documentation and ADT specs
+│   └── LOGGING_USAGE.md    # Game logging system usage guide
 ├── boards/
 │   └── perfect.txt         # Sample game board configuration
-├── main.go                 # Main server application
+├── main.go                 # Main server application  
 ├── index.html              # Web-based game client interface
 ├── Makefile                # Build and development commands
 └── go.mod                  # Go module definition
@@ -187,7 +197,7 @@ This creates a 3×3 board where cards can be matched (apple-apple, banana-banana
 
 ```bash
 make build          # Build server binary
-make test           # Run comprehensive test suite  
+make test           # Run comprehensive test suite (140+ tests)
 make dev-test       # Run tests with verbose output
 make format         # Format Go source code
 ```
@@ -197,51 +207,82 @@ make format         # Format Go source code
 ```bash
 make run            # Start server (default: port 8080, boards/perfect.txt)
 make run PORT=9000  # Start on custom port
-make simulation     # Run game simulation script
+make simulation     # Run MIT 6.102 course compliance simulation
 make clean          # Clean build artifacts
+```
+
+### Game Logging and Debugging
+
+The server includes comprehensive logging for debugging game mechanics:
+
+```bash
+# Run with detailed game logging
+go run main.go 2>&1 | tee game.log
+
+# View logging documentation  
+cat docs/LOGGING_USAGE.md
 ```
 
 ### Available Makefile Targets
 
 - `build` - Compile server binary as `memory-scramble`
-- `test` - Execute full test suite with coverage
+- `test` - Execute full test suite with coverage (140+ tests)
 - `run` - Start development server (configurable PORT/BOARD)
-- `simulation` - Run automated game simulation
+- `simulation` - Run MIT 6.102 course compliance simulation (4 players, 100 moves each)
 - `clean` - Remove build artifacts and temp files
 - `format` - Apply Go code formatting standards
 - `help` - Display available commands and usage
 
+### Course Compliance Features
+
+This implementation meets all MIT 6.102 Lab 3 requirements:
+
+- **✅ Complete Rule Implementation**: All MIT Memory Scramble rules (1A-3B)
+- **✅ Comprehensive Test Coverage**: 140+ tests covering all rules and edge cases  
+- **✅ Multi-player Simulation**: 4 players, 100 moves each, 0.1-2ms timeouts, deterministic
+- **✅ Proper ADT Structure**: Representation invariants, checkRep(), safety from rep exposure
+- **✅ Complete Documentation**: API specs, method signatures, pre/postconditions
+
 ## Testing Framework
 
-The test suite provides comprehensive coverage of all game mechanics:
+The test suite provides comprehensive coverage of all game mechanics with **140+ test cases**:
 
 ### Test Categories
 
-1. **Board Parsing Tests**
+1. **Board Parsing Tests** (`board_test.go`)
    - File format validation
-   - Error handling for malformed boards
+   - Error handling for malformed boards  
    - Dimension and content verification
 
-2. **Game Rules Tests** (MIT 6.102 PS4 Rules)
+2. **Game Rules Tests** (`rules_test.go` - MIT 6.102 PS4 Rules)
    - **Rules 1-A through 1-D**: First card flip scenarios including face-up uncontrolled card handling
    - **Rules 2-A through 2-E**: Second card flip scenarios including proper mismatch handling
    - **Rules 3-A and 3-B**: Next move processing with correct timing for card removal and face-down transitions
+   - **Complex Rule Interactions**: Advanced scenarios like Rule 2-E + Rule 3-B combinations
 
-3. **Concurrency Tests**
+3. **Advanced Features Tests** (`advanced_features_test.go`)
+   - Complex multi-player card interactions
+   - Sophisticated rule edge cases
+   - Rule combination scenarios that prevent board exploration
+
+4. **Concurrency Tests** (`concurrency_test.go`)
    - Multi-player simultaneous operations
-   - Thread safety validation
+   - Thread safety validation  
    - Waiting and notification mechanisms
 
-4. **API Integration Tests**
+5. **API Integration Tests** (`commands_test.go`)
    - All HTTP commands through Commands layer
    - Error condition handling
    - Board state consistency
 
-5. **Edge Case Tests**
-   - Complex multi-player card interaction scenarios
-   - Invalid positions and parameters
-   - Large boards and performance
-   - Boundary condition validation
+6. **Scenario Tests** (`scenarios_test.go`)  
+   - End-to-end gameplay scenarios
+   - Multi-player interaction patterns
+   - Complete game workflows
+
+7. **Bug Regression Tests** (`bug_test.go`)
+   - Tests for discovered and fixed bugs
+   - Prevents regression of critical fixes
 
 ### Running Tests
 
