@@ -67,7 +67,7 @@ The game implements all rules from the MIT 6.102 PS4 specification:
 
 ### Running the Server
 
-![Development Commands](./img/makefile_targets.png)
+![Development Commands](./img/makefile_help.png)
 
 The main server architecture follows a clean three-layer design:
 
@@ -260,7 +260,7 @@ go test ./test/... -run TestConcurrency
 
 The `board` package implements a complete ADT with proper abstraction function, representation invariant, and thread safety:
 
-![Board ADT Structure](./img/board_adt_structure.png)
+![Board ADT Structure](./img/board_adt.png)
 
 **Safety from Rep Exposure:**
 - Cards array never returned directly
