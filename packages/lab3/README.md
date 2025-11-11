@@ -52,10 +52,6 @@ The game implements all rules from the MIT 6.102 PS4 specification:
 - Go 1.25+ installed
 - Web browser for the game interface
 
-### Running the Server
-
-![Development Commands](./img/makefile_help.png)
-
 The main server architecture follows a clean three-layer design:
 
 ![Server Architecture](./img/main_architecture.png)
