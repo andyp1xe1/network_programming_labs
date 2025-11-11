@@ -100,7 +100,10 @@ func TestBoardLook(t *testing.T) {
 }
 
 // Test Memory Scramble Rule 1: First card flips
+// Rule 1: When a player tries to turn over a first card by identifying a space on the board...
 func TestRule1FirstCard(t *testing.T) {
+	// Rule 1-A: If there is no card there (the player identified an empty space,
+	// perhaps because the card was just removed by another player), the operation fails.
 	t.Run("Rule 1-A: No card at position", func(t *testing.T) {
 		content := "1x1\nA\n"
 		b := createTestBoard(t, content)
@@ -116,6 +119,8 @@ func TestRule1FirstCard(t *testing.T) {
 		}
 	})
 
+	// Rule 1-B: If the card is face down, it turns face up (all players can now see it)
+	// and the player controls that card.
 	t.Run("Rule 1-B: Face-down card turns face up", func(t *testing.T) {
 		content := "1x1\nA\n"
 		b := createTestBoard(t, content)
@@ -133,6 +138,8 @@ func TestRule1FirstCard(t *testing.T) {
 		}
 	})
 
+	// Rule 1-C: If the card is already face up, but not controlled by another player,
+	// then it remains face up, and the player controls the card.
 	t.Run("Rule 1-C: Face-up uncontrolled card", func(t *testing.T) {
 		content := "2x1\nA\nB\n"
 		b := createTestBoard(t, content)
@@ -170,6 +177,9 @@ func TestRule1FirstCard(t *testing.T) {
 		}
 	})
 
+	// Rule 1-D: And if the card is face up and controlled by another player,
+	// the operation waits. The player will contend with other players to take
+	// control of the card at the next opportunity.
 	t.Run("Rule 1-D: Face-up controlled card - should wait", func(t *testing.T) {
 		content := "1x1\nA\n"
 		b := createTestBoard(t, content)
@@ -190,7 +200,10 @@ func TestRule1FirstCard(t *testing.T) {
 }
 
 // Test Memory Scramble Rule 2: Second card flips
+// Rule 2: Once a player controls their first card, they can try to turn over a second card...
 func TestRule2SecondCard(t *testing.T) {
+	// Rule 2-A: If there is no card there, the operation fails. The player also relinquishes
+	// control of their first card (but it remains face up for now).
 	t.Run("Rule 2-A: No card at second position", func(t *testing.T) {
 		// We'll simulate this by creating a board with actual empty positions
 		// Since ReplaceCard doesn't actually remove cards, we'll test the error path differently
@@ -210,6 +223,9 @@ func TestRule2SecondCard(t *testing.T) {
 		// This is slightly different from the MIT spec but represents a valid interpretation
 	})
 
+	// Rule 2-B: If the card is face up and controlled by a player (another player or themselves),
+	// the operation fails. To avoid deadlocks, the operation does not wait. The player also
+	// relinquishes control of their first card (but it remains face up for now).
 	t.Run("Rule 2-B: Second card controlled by another player", func(t *testing.T) {
 		content := "2x1\nA\nB\n"
 		b := createTestBoard(t, content)
@@ -233,6 +249,38 @@ func TestRule2SecondCard(t *testing.T) {
 		}
 	})
 
+	// Test Rule 2-B edge case: player tries to flip the same card they already control as second card
+	t.Run("Rule 2-B: Player tries to flip same card as second", func(t *testing.T) {
+		content := "1x1\nA\n"
+		b := createTestBoard(t, content)
+
+		// Player1 controls the card
+		err := b.Flip("player1", 0, 0)
+		if err != nil {
+			t.Errorf("First flip should succeed: %v", err)
+		}
+
+		// Player1 tries to flip the same card as second - should fail per Rule 2-B
+		// "If the card is face up and controlled by a player (another player or themselves), the operation fails"
+		err = b.Flip("player1", 0, 0)
+		if err == nil {
+			t.Error("Player should not be able to flip the same card they control as second card")
+		}
+
+		// Player should have relinquished control of the card (Rule 2-B)
+		result := b.Look("player1")
+		if strings.Contains(result, "my A") {
+			t.Error("Player should have relinquished control after Rule 2-B failure")
+		}
+
+		// Card should remain face up but uncontrolled
+		if !strings.Contains(result, "up A") {
+			t.Error("Card should remain face up after Rule 2-B failure")
+		}
+	})
+
+	// Rule 2-C: If the card is face down, or if the card is face up but not controlled by a player, then:
+	// If it is face down, it turns face up.
 	t.Run("Rule 2-C: Face-down card turns face up", func(t *testing.T) {
 		content := "2x1\nA\nB\n"
 		b := createTestBoard(t, content)
@@ -252,6 +300,8 @@ func TestRule2SecondCard(t *testing.T) {
 		}
 	})
 
+	// Rule 2-D: If the two cards are the same, that's a successful match!
+	// The player keeps control of both cards (and they remain face up on the board for now).
 	t.Run("Rule 2-D: Matching cards - player keeps control", func(t *testing.T) {
 		content := "2x1\nA\nA\n"
 		b := createTestBoard(t, content)
@@ -267,6 +317,8 @@ func TestRule2SecondCard(t *testing.T) {
 		}
 	})
 
+	// Rule 2-E: If they are not the same, the player relinquishes control of both cards
+	// (again, they remain face up for now).
 	t.Run("Rule 2-E: Non-matching cards - player relinquishes control", func(t *testing.T) {
 		content := "2x1\nA\nB\n"
 		b := createTestBoard(t, content)
@@ -291,7 +343,13 @@ func TestRule2SecondCard(t *testing.T) {
 }
 
 // Test Memory Scramble Rule 3: Next move processing
+// Rule 3: After trying to turn over a second card, successfully or not, the player will
+// try again to turn over a first card. When they do that, before following the rules above,
+// they finish their previous play:
 func TestRule3NextMove(t *testing.T) {
+	// Rule 3-A: If they had turned over a matching pair, they control both cards. Now, those
+	// cards are removed from the board, and they relinquish control of them. Score-keeping
+	// is not specified as part of the game.
 	t.Run("Rule 3-A: Matching cards removed from board", func(t *testing.T) {
 		content := "2x1\nA\nA\n"
 		b := createTestBoard(t, content)
@@ -315,6 +373,10 @@ func TestRule3NextMove(t *testing.T) {
 		}
 	})
 
+	// Rule 3-B: Otherwise, they had turned over one or two non-matching cards, and relinquished
+	// control but left them face up on the board. Now, for each of those card(s), if the card
+	// is still on the board, currently face up, and currently not controlled by another player,
+	// the card is turned face down.
 	t.Run("Rule 3-B: Non-matching cards turn face down on next move", func(t *testing.T) {
 		content := "3x1\nA\nB\nC\n"
 		b := createTestBoard(t, content)
@@ -419,6 +481,35 @@ func TestConcurrentPlayers(t *testing.T) {
 
 		if err2 == nil || err3 == nil {
 			t.Error("Players should get waiting errors when trying to flip controlled card")
+		}
+	})
+
+	// Test that waiting behavior follows MIT rules: "While one player is waiting to turn over
+	// a first card, other players continue to play normally. They do not wait, unless they
+	// also try to turn over a first card controlled by another player."
+	t.Run("Waiting players don't block other gameplay", func(t *testing.T) {
+		content := "2x2\nA\nB\nC\nD\n"
+		b := createTestBoard(t, content)
+
+		// Player1 controls card at (0,0)
+		b.Flip("player1", 0, 0)
+
+		// Player2 tries to flip the same card - should wait
+		err := b.Flip("player2", 0, 0)
+		if err == nil || !strings.Contains(err.Error(), "waiting") {
+			t.Error("Player2 should be waiting for controlled card")
+		}
+
+		// Player3 should be able to play normally on other cards
+		err = b.Flip("player3", 0, 1)
+		if err != nil {
+			t.Errorf("Player3 should be able to flip other cards normally while player2 waits: %v", err)
+		}
+
+		// Verify Player3 controls their card
+		result := b.Look("player3")
+		if !strings.Contains(result, "my B") {
+			t.Error("Player3 should control their card normally despite player2 waiting")
 		}
 	})
 }
@@ -654,6 +745,98 @@ func TestCommandsAPI(t *testing.T) {
 
 // Test edge cases and error conditions
 func TestEdgeCases(t *testing.T) {
+	// MIT Website Example: Alice, Bob, Charlie scenario with 3x3 grid of hearts
+	// This test follows the exact example from the MIT website documentation
+	t.Run("MIT Example: Alice/Bob/Charlie heart scenario", func(t *testing.T) {
+		// Setup: 3x3 grid with hearts as shown in MIT example
+		// Row 0: ❤️ 💛 ❤️  (positions (0,0), (0,1), (0,2))
+		// Row 1: 💚 💛 💚  (positions (1,0), (1,1), (1,2))
+		// Row 2: 💜 💜 💜  (positions (2,0), (2,1), (2,2))
+		content := "3x3\n❤️\n💛\n❤️\n💚\n💛\n💚\n💜\n💜\n💜\n"
+		b := createTestBoard(t, content)
+
+		// Step 1: Alice turns over the top left card (0,0 - ❤️) - Rule 1-B
+		err := b.Flip("alice", 0, 0)
+		if err != nil {
+			t.Errorf("Alice flip (0,0) failed: %v", err)
+		}
+
+		// Alice should control the red heart
+		result := b.Look("alice")
+		if !strings.Contains(result, "my ❤️") {
+			t.Error("Alice should control the red heart at (0,0)")
+		}
+
+		// Step 2: Bob and Charlie both try to flip the same card - Rule 1-D (waiting)
+		err = b.Flip("bob", 0, 0)
+		if err == nil || !strings.Contains(err.Error(), "waiting") {
+			t.Error("Bob should be waiting for the card Alice controls")
+		}
+
+		err = b.Flip("charlie", 0, 0)
+		if err == nil || !strings.Contains(err.Error(), "waiting") {
+			t.Error("Charlie should be waiting for the card Alice controls")
+		}
+
+		// Step 3: Alice turns over bottom right card (2,2 - 💜) - Rule 2-C, then Rule 2-E
+		err = b.Flip("alice", 2, 2)
+		if err != nil {
+			t.Errorf("Alice flip (2,2) failed: %v", err)
+		}
+
+		// Give time for Rule 2-E processing (non-matching cards, relinquish control)
+		time.Sleep(10 * time.Millisecond)
+
+		// Alice should no longer control any cards, but they remain face up
+		result = b.Look("alice")
+		if strings.Contains(result, "my ❤️") || strings.Contains(result, "my 💜") {
+			t.Error("Alice should have relinquished control after non-matching cards")
+		}
+		if !strings.Contains(result, "up ❤️") || !strings.Contains(result, "up 💜") {
+			t.Error("Cards should remain face up after mismatch (Rule 2-E)")
+		}
+
+		// Step 4: Either Bob or Charlie should now be able to control the red heart - Rule 1-C
+		// Let's say Bob gets it
+		err = b.Flip("bob", 0, 0)
+		if err != nil {
+			t.Errorf("Bob should be able to take control of face-up uncontrolled card: %v", err)
+		}
+
+		result = b.Look("bob")
+		if !strings.Contains(result, "my ❤️") {
+			t.Error("Bob should now control the red heart")
+		}
+
+		// Step 5: Alice starts a new move by flipping center card (1,1 - 💛) - Rule 3-B applies
+		err = b.Flip("alice", 1, 1)
+		if err != nil {
+			t.Errorf("Alice flip (1,1) failed: %v", err)
+		}
+
+		// Give time for Rule 3-B processing
+		time.Sleep(10 * time.Millisecond)
+
+		// The purple heart should now be face down (Rule 3-B), but red heart stays up (controlled by Bob)
+		result = b.Look("alice")
+		lines := strings.Split(strings.TrimSpace(result), "\n")
+
+		// Position (0,0) should still show "up ❤️" (controlled by Bob)
+		if !strings.Contains(lines[1], "up ❤️") {
+			t.Error("Red heart should still be face up (controlled by Bob)")
+		}
+
+		// Position (2,2) should now be "down" (Rule 3-B - was face up but uncontrolled)
+		if lines[9] != "down" {
+			t.Errorf("Purple heart should be face down after Rule 3-B, got: %s", lines[9])
+		}
+
+		// Alice should control the yellow heart at (1,1)
+		if lines[5] != "my 💛" {
+			t.Errorf("Alice should control yellow heart, got: %s", lines[5])
+		}
+	})
+
 	t.Run("Complex multi-player card interaction scenario", func(t *testing.T) {
 		// Setup: 4 cards in a 2x2 grid for the scenario
 		content := "2x2\nA\nB\nA\nB\n"
@@ -796,6 +979,56 @@ func TestEdgeCases(t *testing.T) {
 		// In real gameplay, cards are removed via matching pairs
 		if !strings.Contains(result, "1x1") {
 			t.Error("Board should still report correct dimensions")
+		}
+	})
+
+	// MIT Rule note: "If the player never tries to turn over a new first card,
+	// then the steps of 3-A/B never occur."
+	t.Run("Player never makes next move - matched cards stay on board", func(t *testing.T) {
+		content := "2x1\nA\nA\n"
+		b := createTestBoard(t, content)
+
+		// Player matches cards but never makes another move
+		b.Flip("player1", 0, 0)
+		b.Flip("player1", 1, 0)
+
+		// Wait to ensure no automatic processing
+		time.Sleep(20 * time.Millisecond)
+
+		// Cards should remain on board and controlled by player (Rule 3-A never triggers)
+		result := b.Look("player1")
+		lines := strings.Split(strings.TrimSpace(result), "\n")
+
+		if lines[1] != "my A" || lines[2] != "my A" {
+			t.Error("Matched cards should remain controlled by player until next move")
+		}
+
+		// Verify they haven't been removed (would show "none")
+		if lines[1] == "none" || lines[2] == "none" {
+			t.Error("Cards should not be removed until player makes next move")
+		}
+	})
+
+	t.Run("Player never makes next move - unmatched cards stay face up", func(t *testing.T) {
+		content := "2x1\nA\nB\n"
+		b := createTestBoard(t, content)
+
+		// Player has non-matching cards but never makes another move
+		b.Flip("player1", 0, 0)
+		b.Flip("player1", 1, 0)
+
+		// Wait to ensure Rule 2-E processing completes but Rule 3-B never triggers
+		time.Sleep(20 * time.Millisecond)
+
+		// Cards should remain face up but uncontrolled (Rule 3-B never triggers)
+		result := b.Look("player1")
+		if !strings.Contains(result, "up A") || !strings.Contains(result, "up B") {
+			t.Error("Unmatched cards should remain face up until player makes next move")
+		}
+
+		// Player should not control them (Rule 2-E already processed)
+		if strings.Contains(result, "my A") || strings.Contains(result, "my B") {
+			t.Error("Player should have relinquished control per Rule 2-E")
 		}
 	})
 
