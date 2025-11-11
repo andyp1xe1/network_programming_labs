@@ -14,7 +14,7 @@ lab3/
 │   └── server/             # HTTP server implementation
 │       └── server.go       # Web server with CORS and routing
 ├── test/
-│   └── board_test.go       # Comprehensive test suite (25+ test cases)
+│   └── board_test.go       # Comprehensive test suite (43 test cases)
 ├── cmd/simulation/         # Simulation and testing utilities
 │   └── main.go             # Game simulation script
 ├── boards/
@@ -39,12 +39,12 @@ The game implements all rules from the MIT 6.102 PS4 specification:
 - **2-A**: Flipping empty position relinquishes control of first card
 - **2-B**: Flipping controlled card relinquishes control of first card
 - **2-C**: Face-down card becomes face-up
-- **2-D**: Matching cards remain controlled by player
-- **2-E**: Non-matching cards trigger next move processing
+- **2-D**: Matching cards remain controlled by player until next move
+- **2-E**: Non-matching cards cause immediate control relinquishment but remain face-up
 
-### Rule 3: Move Processing
-- **3-A**: Matching cards are removed from the board
-- **3-B**: Non-matching cards return to face-down state
+### Rule 3: Next Move Processing
+- **3-A**: Matching cards from previous move are removed from the board
+- **3-B**: Non-matching cards from previous move return to face-down state when new move begins
 
 ## Quick Start
 
@@ -69,7 +69,14 @@ The main server architecture follows a clean three-layer design:
 
 ## HTTP API Endpoints
 
-All endpoints return board state in the specified format: `ROWxCOL\n` followed by card states.
+All game endpoints return board state in the specified format: `ROWxCOL\n` followed by card states. All endpoints include CORS headers for cross-origin requests.
+
+### Web Interface
+
+```http
+GET /
+```
+Serves the web-based game client interface (`index.html`).
 
 ### Core Game Operations
 
@@ -77,28 +84,40 @@ All endpoints return board state in the specified format: `ROWxCOL\n` followed b
 GET /look/{playerID}
 ```
 Returns current board state from player's perspective.
+- **Response**: Board state with dimensions and card status for each position
+- **Status Codes**: 200 (success), 400 (missing player ID), 500 (server error)
 
 ```http  
 GET /flip/{playerID}/{row},{col}
 ```
-Attempts to flip card at specified position.
+Attempts to flip card at specified position for the given player.
+- **Parameters**: `playerID` (string), position as `row,col` (integers)
+- **Response**: Updated board state on success, error message on failure
+- **Status Codes**: 200 (success), 400 (invalid format/missing params), 409 (game rule violation)
 
 ```http
 GET /watch/{playerID}
 ```
-Long-polling endpoint that waits for board changes.
+Long-polling endpoint that waits for board changes before returning updated state.
+- **Response**: Board state when change occurs or timeout
+- **Status Codes**: 200 (success), 400 (missing player ID), 500 (server error)
 
 ### Advanced Operations
 
 ```http
 GET /replace/{playerID}/{fromCard}/{toCard}
 ```
-Replaces all instances of `fromCard` with `toCard` content.
+Replaces all instances of `fromCard` with `toCard` content across the entire board.
+- **Parameters**: `playerID` (string), `fromCard` and `toCard` (card content strings)
+- **Response**: Updated board state after replacement
+- **Status Codes**: 200 (success), 400 (missing parameters), 500 (server error)
 
 ```http
 GET /restart
 ```
-Resets board to initial state, all cards face-down.
+Resets board to initial state with all cards face-down and no player control.
+- **Response**: "restarted" confirmation message
+- **Status Codes**: 200 (success), 500 (server error)
 
 ### Response Formats
 
@@ -204,9 +223,9 @@ The test suite provides comprehensive coverage of all game mechanics:
    - Dimension and content verification
 
 2. **Game Rules Tests** (MIT 6.102 PS4 Rules)
-   - **Rules 1-A through 1-D**: First card flip scenarios
-   - **Rules 2-A through 2-E**: Second card flip scenarios  
-   - **Rules 3-A and 3-B**: Move processing and card removal
+   - **Rules 1-A through 1-D**: First card flip scenarios including face-up uncontrolled card handling
+   - **Rules 2-A through 2-E**: Second card flip scenarios including proper mismatch handling
+   - **Rules 3-A and 3-B**: Next move processing with correct timing for card removal and face-down transitions
 
 3. **Concurrency Tests**
    - Multi-player simultaneous operations
@@ -219,6 +238,7 @@ The test suite provides comprehensive coverage of all game mechanics:
    - Board state consistency
 
 5. **Edge Case Tests**
+   - Complex multi-player card interaction scenarios
    - Invalid positions and parameters
    - Large boards and performance
    - Boundary condition validation
