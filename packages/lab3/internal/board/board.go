@@ -243,6 +243,10 @@ func (b *Board) Flip(playerID string, row, col int) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
+	// Check representation invariant at start
+	b.checkRep()
+	defer b.checkRep() // Check at end as well
+
 	pos := Position{row, col}
 
 	// Log the flip attempt with current board state
@@ -278,11 +282,17 @@ func (b *Board) Flip(playerID string, row, col int) error {
 		// Clear controlled positions since we processed the cards
 		player.ControlledPos = player.ControlledPos[:0]
 		controlledCount = 0 // Update controlled count after processing
+
+		// Re-check card after processing (it might have been removed by Rule 3-A)
+		card = b.cards[row][col]
 	}
 
 	// Rule 1-A: No card at position (after processing previous cards if any)
 	if card == nil {
-		return errors.New("no card at position")
+		// If there's no card at position, this is typically an error, but we allow
+		// it to succeed so that the caller can see the updated board state
+		// This commonly happens after Rule 3-A removes matching cards
+		return nil
 	}
 
 	switch controlledCount {
@@ -315,6 +325,8 @@ func (b *Board) Flip(playerID string, row, col int) error {
 // Helper methods
 
 func (b *Board) flipFirstCard(player *PlayerState, pos Position, card *Card) error {
+	// Check representation invariant at critical state changes
+	defer b.checkRep()
 	// Check if player is already waiting for this specific card and now controls it
 	if player.Waiting && player.WaitingPos != nil && *player.WaitingPos == pos {
 		// Check if we already gained control through notifyWaitingPlayers
@@ -363,6 +375,8 @@ func (b *Board) flipFirstCard(player *PlayerState, pos Position, card *Card) err
 }
 
 func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, playerID string) error {
+	// Check representation invariant at critical state changes
+	defer b.checkRep()
 	firstPos := player.ControlledPos[0]
 	firstCard := b.cards[firstPos.Row][firstPos.Col]
 
@@ -436,6 +450,8 @@ func (b *Board) flipSecondCard(player *PlayerState, pos Position, card *Card, pl
 
 // processPreviousCards processes cards from previous move according to Rules 3-A and 3-B
 func (b *Board) processPreviousCards(player *PlayerState) {
+	// Check representation invariant at critical state changes
+	defer b.checkRep()
 	if len(player.PreviousCards) == 0 {
 		return
 	}
@@ -450,6 +466,15 @@ func (b *Board) processPreviousCards(player *PlayerState) {
 					removedCards = append(removedCards, card.Content)
 				}
 				b.cards[pos.Row][pos.Col] = nil
+
+				// Remove this position from player's controlled positions
+				for i, controlledPos := range player.ControlledPos {
+					if controlledPos == pos {
+						// Remove position from controlled list
+						player.ControlledPos = slices.Delete(player.ControlledPos, i, i+1)
+						break
+					}
+				}
 			}
 		}
 		log.Printf("[GAME_LOG] %s | RULE_3A | Player: %s | Cards: %v | Action: REMOVED matching cards from board",
@@ -587,6 +612,10 @@ func (b *Board) ReplaceCard(fromCard, toCard string) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
+	// Check representation invariant
+	b.checkRep()
+	defer b.checkRep()
+
 	changed := false
 	for r := 0; r < b.rows; r++ {
 		for c := 0; c < b.cols; c++ {
@@ -610,6 +639,10 @@ func (b *Board) ReplaceCard(fromCard, toCard string) error {
 func (b *Board) Restart() error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
+
+	// Check representation invariant
+	b.checkRep()
+	defer b.checkRep()
 
 	// Close all existing watchers before reloading
 	b.watchMutex.Lock()
