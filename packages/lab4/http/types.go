@@ -29,3 +29,22 @@ type Response struct {
 	Error   string `json:"error,omitempty"`
 	Data    any    `json:"data,omitempty"`
 }
+
+// QuorumManager interface for dynamic quorum configurationtype
+type QuorumManager interface {
+	SetCommitThreshold(threshold int) error
+	GetCommitThreshold() int
+	GetFollowerCount() int
+}
+
+// SetQuorumRequest for updating quorum configuration
+type SetQuorumRequest struct {
+	Quorum int `json:"quorum"`
+}
+
+// QuorumStatusResponse for quorum status information
+type QuorumStatusResponse struct {
+	CurrentQuorum   int `json:"current_quorum"`
+	MaxFollowers    int `json:"max_followers"`
+	ActiveFollowers int `json:"active_followers"`
+}

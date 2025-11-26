@@ -4,174 +4,232 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
 	"sync"
 	"time"
+
+	kvhttp "github.com/andyp1xe1/network_programming_labs/packages/lab4/http"
+	"github.com/andyp1xe1/network_programming_labs/packages/lab4/store"
 )
 
-type KVClient struct {
-	baseURL string
-	client  *http.Client
-}
-
-type SetRequest struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-	ID    string `json:"id"`
-}
-
-type GetRequest struct {
-	Key string `json:"key"`
-}
-
-type Response struct {
-	Success bool   `json:"success"`
-	Value   string `json:"value,omitempty"`
-	Error   string `json:"error,omitempty"`
-}
+const (
+	// LEADER_URL is the fixed endpoint for the leader node that supports admin operations
+	LEADER_URL = "http://localhost:9000"
+)
 
 type Result struct {
-	Quorum     int     `json:"quorum"`
-	AvgLatency float64 `json:"avg_latency_ms"`
-	Consistent bool    `json:"consistent"`
-	Latencies  []int64 `json:"latencies_ms"`
+	Quorum            int     `json:"quorum"`
+	AvgLatency        float64 `json:"avg_latency_ms"`
+	Consistent        bool    `json:"consistent"`
+	ConsistentNodes   int     `json:"consistent_nodes"`
+	TotalNodes        int     `json:"total_nodes"`
+	InconsistentNodes []int   `json:"inconsistent_nodes,omitempty"`
+	Latencies         []int64 `json:"latencies_ms"`
 }
 
-func NewClient(baseURL string) *KVClient {
-	return &KVClient{
-		baseURL: baseURL,
-		client:  &http.Client{Timeout: 30 * time.Second},
-	}
+func NewClient(baseURL string) store.Store {
+	return kvhttp.NewHTTPClient(baseURL, "analysis-client")
 }
 
-func (c *KVClient) Set(key, value string) (time.Duration, error) {
+// TimedSet performs a Set operation and measures the duration
+func TimedSet(client store.Store, key, value string) (time.Duration, error) {
 	start := time.Now()
-	req := SetRequest{Key: key, Value: value, ID: "test"}
-
-	data, err := json.Marshal(req)
-	if err != nil {
-		log.Printf("ERROR: Failed to marshal set request for key=%s: %v", key, err)
-		return 0, fmt.Errorf("marshal error: %v", err)
-	}
-
-	// Reduced logging for performance - uncomment for detailed debugging
-	// log.Printf("DEBUG: Sending SET request for key=%s to %s", key, c.baseURL)
-	resp, err := c.client.Post(c.baseURL+"/set", "application/json", bytes.NewReader(data))
-	if err != nil {
-		log.Printf("ERROR: SET request failed for key=%s: %v", key, err)
-		return 0, err
-	}
-	defer resp.Body.Close()
-
-	var result Response
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Printf("ERROR: Failed to decode SET response for key=%s: %v", key, err)
-		return 0, fmt.Errorf("decode error: %v", err)
-	}
-
-	if !result.Success {
-		log.Printf("ERROR: SET operation failed for key=%s: %s", key, result.Error)
-		return 0, fmt.Errorf("set failed: %s", result.Error)
-	}
-
+	ctx := context.Background()
+	err := client.Set(ctx, key, value)
 	duration := time.Since(start)
-	// Reduced logging for performance - uncomment for detailed debugging
-	// log.Printf("DEBUG: SET successful for key=%s, latency=%vms", key, duration.Milliseconds())
-	return duration, nil
+	return duration, err
 }
 
-func (c *KVClient) Get(key string) (string, error) {
-	req := GetRequest{Key: key}
-	data, err := json.Marshal(req)
+// setQuorum dynamically sets the quorum on the leader using the admin API
+func setQuorum(quorum int) error {
+	requestData := map[string]int{"quorum": quorum}
+	jsonData, err := json.Marshal(requestData)
 	if err != nil {
-		log.Printf("ERROR: Failed to marshal get request for key=%s: %v", key, err)
-		return "", fmt.Errorf("marshal error: %v", err)
+		return fmt.Errorf("failed to marshal quorum request: %v", err)
 	}
 
-	// Reduced logging for performance - uncomment for detailed debugging
-	// log.Printf("DEBUG: Sending GET request for key=%s to %s", key, c.baseURL)
-	resp, err := c.client.Post(c.baseURL+"/get", "application/json", bytes.NewReader(data))
+	adminURL := LEADER_URL + "/admin/quorum"
+	resp, err := http.Post(adminURL, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("ERROR: GET request failed for key=%s: %v", key, err)
-		return "", err
+		return fmt.Errorf("failed to make quorum request to leader: %v", err)
 	}
 	defer resp.Body.Close()
 
-	var result Response
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		log.Printf("ERROR: Failed to decode GET response for key=%s: %v", key, err)
-		return "", fmt.Errorf("decode error: %v", err)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %v", err)
 	}
 
-	if !result.Success {
-		log.Printf("DEBUG: GET failed for key=%s: %s", key, result.Error)
-		return "", fmt.Errorf("get failed: %s", result.Error)
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("quorum update failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Reduced logging for performance - uncomment for detailed debugging
-	// log.Printf("DEBUG: GET successful for key=%s, value=%s", key, result.Value)
-	return result.Value, nil
+	return nil
 }
 
-// Removed docker restart functionality - assuming docker compose is already running
-// To change quorum, manually update the .env file and restart docker-compose
+// verifyQuorum checks that the quorum was set correctly on the leader
+func verifyQuorum(expectedQuorum int) error {
+	adminURL := LEADER_URL + "/admin/quorum"
+	resp, err := http.Get(adminURL)
+	if err != nil {
+		return fmt.Errorf("failed to get quorum status from leader: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read status response: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("quorum status request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var response kvhttp.Response
+	if err := json.Unmarshal(body, &response); err != nil {
+		return fmt.Errorf("failed to parse status response: %v", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("quorum status response indicates failure: %s", response.Error)
+	}
+
+	data, ok := response.Data.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("unexpected response data format")
+	}
+
+	currentQuorum, ok := data["current_quorum"].(float64)
+	if !ok {
+		return fmt.Errorf("current_quorum not found in response")
+	}
+
+	if int(currentQuorum) != expectedQuorum {
+		return fmt.Errorf("quorum mismatch: expected %d, got %d", expectedQuorum, int(currentQuorum))
+	}
+
+	return nil
+}
+
+// verifyAdminAPI checks that the admin API is available on the leader
+func verifyAdminAPI() error {
+	adminURL := LEADER_URL + "/admin/quorum"
+	resp, err := http.Get(adminURL)
+	if err != nil {
+		return fmt.Errorf("admin API not reachable at leader (%s): %v", LEADER_URL, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("admin API not available - ensure %s is a leader node with admin endpoints enabled", LEADER_URL)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("admin API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// verifyLeaderRole ensures we're connected to an actual leader (not a follower)
+func verifyLeaderRole() error {
+	adminURL := LEADER_URL + "/admin/quorum"
+	resp, err := http.Get(adminURL)
+	if err != nil {
+		return fmt.Errorf("failed to contact node: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("node at %s does not support admin endpoints - likely a follower, not a leader", LEADER_URL)
+	}
+
+	if resp.StatusCode == http.StatusNotImplemented {
+		return fmt.Errorf("node at %s explicitly indicates admin not supported - likely a follower", LEADER_URL)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("leader verification failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read leader verification response: %v", err)
+	}
+
+	var response kvhttp.Response
+	if err := json.Unmarshal(body, &response); err != nil {
+		return fmt.Errorf("invalid leader response format: %v", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("leader returned error response: %s", response.Error)
+	}
+
+	data, ok := response.Data.(map[string]interface{})
+	if !ok || data["current_quorum"] == nil {
+		return fmt.Errorf("response missing quorum data - may not be a leader")
+	}
+
+	return nil
+}
 
 func waitForLeader() bool {
-	log.Printf("INFO: Waiting for leader to become ready...")
-	client := NewClient("http://localhost:9000")
+	client := NewClient(LEADER_URL)
+	ctx := context.Background()
 
 	for i := 0; i < 30; i++ {
-		log.Printf("DEBUG: Leader readiness check attempt %d/30", i+1)
-		if _, err := client.Get("test"); err == nil || (err != nil && (err.Error() == "get failed: " || err.Error() == "get failed: key not found")) {
-			log.Printf("INFO: Leader is responding, waiting 5s for followers to sync...")
+		if _, err := client.Get(ctx, "test"); err == nil || (err != nil && (err.Error() == "get failed: " || err.Error() == "get failed: key not found")) {
 			time.Sleep(5 * time.Second) // Wait for followers
-			log.Printf("INFO: Leader and followers are ready")
 			return true
-		} else {
-			log.Printf("DEBUG: Leader not ready yet: %v", err)
 		}
 		time.Sleep(2 * time.Second)
 	}
 
-	log.Printf("ERROR: Leader failed to become ready after 60 seconds")
 	return false
 }
 
 func runTest(quorum int) Result {
-	log.Printf("INFO: ===== Starting test for quorum %d =====", quorum)
-	log.Printf("INFO: Assuming docker compose is running with quorum=%d", quorum)
+	fmt.Printf("Testing quorum %d...\n", quorum)
 
 	if !waitForLeader() {
 		log.Fatalf("FATAL: Leader not ready after multiple attempts")
 	}
 
-	leader := NewClient("http://localhost:9000")
+	if err := setQuorum(quorum); err != nil {
+		return Result{Quorum: quorum, AvgLatency: 0, Consistent: false, ConsistentNodes: 0, TotalNodes: 5, Latencies: []int64{}}
+	}
 
-	// 100 writes, 10 at a time, on 10 keys
+	if err := verifyQuorum(quorum); err != nil {
+		return Result{Quorum: quorum, AvgLatency: 0, Consistent: false, ConsistentNodes: 0, TotalNodes: 5, Latencies: []int64{}}
+	}
+
+	time.Sleep(2 * time.Second)
+
+	leader := NewClient(LEADER_URL)
+
 	const numWrites = 100
 	const concurrency = 10
 	const numKeys = 10
-
-	log.Printf("INFO: Test configuration - writes:%d, concurrency:%d, keys:%d", numWrites, concurrency, numKeys)
 
 	keys := make([]string, numKeys)
 	for i := range keys {
 		keys[i] = fmt.Sprintf("key_%d", i)
 	}
-	log.Printf("INFO: Generated %d test keys: %v", len(keys), keys)
 
 	var latencies []int64
 	var failedWrites int64
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	semaphore := make(chan struct{}, concurrency)
-
-	log.Printf("INFO: Starting %d concurrent write operations...", numWrites)
-	startTime := time.Now()
 
 	for i := 0; i < numWrites; i++ {
 		wg.Add(1)
@@ -183,7 +241,7 @@ func runTest(quorum int) Result {
 			key := keys[writeNum%numKeys]
 			value := fmt.Sprintf("value_%d_%d", writeNum, quorum)
 
-			if duration, err := leader.Set(key, value); err == nil {
+			if duration, err := TimedSet(leader, key, value); err == nil {
 				mu.Lock()
 				latencies = append(latencies, duration.Milliseconds())
 				mu.Unlock()
@@ -191,202 +249,161 @@ func runTest(quorum int) Result {
 				mu.Lock()
 				failedWrites++
 				mu.Unlock()
-				log.Printf("WARNING: Write %d failed for key=%s: %v", writeNum, key, err)
 			}
 		}(i)
 	}
 
-	log.Printf("INFO: Waiting for all write operations to complete...")
 	wg.Wait()
 
-	totalDuration := time.Since(startTime)
-	log.Printf("INFO: Write operations completed in %v - successful:%d, failed:%d",
-		totalDuration, len(latencies), failedWrites)
+	if len(latencies) == 0 {
+		return Result{Quorum: quorum, AvgLatency: 0, Consistent: false, ConsistentNodes: 0, TotalNodes: 5, Latencies: []int64{}}
+	}
 
-	// Calculate average latency
 	var sum int64
 	for _, lat := range latencies {
 		sum += lat
 	}
-
-	if len(latencies) == 0 {
-		log.Printf("ERROR: No successful writes for quorum %d", quorum)
-		return Result{Quorum: quorum, AvgLatency: 0, Consistent: false, Latencies: []int64{}}
-	}
-
 	avgLatency := float64(sum) / float64(len(latencies))
-	log.Printf("INFO: Average latency for quorum %d: %.2f ms (from %d samples)", quorum, avgLatency, len(latencies))
 
-	// Wait for replication
-	log.Printf("INFO: Waiting 3 seconds for replication to complete...")
+	fmt.Printf("Writes: %d successful, %d failed, avg latency: %.2fms\n", len(latencies), failedWrites, avgLatency)
+
 	time.Sleep(3 * time.Second)
 
-	// Check consistency
-	log.Printf("INFO: Checking consistency across all nodes...")
-	consistent := checkConsistency(keys)
-
-	if consistent {
-		log.Printf("INFO: ✓ All nodes are consistent for quorum %d", quorum)
-	} else {
-		log.Printf("WARNING: ✗ Consistency issues detected for quorum %d", quorum)
-	}
+	consistencyResult := checkConsistency(keys)
 
 	return Result{
-		Quorum:     quorum,
-		AvgLatency: avgLatency,
-		Consistent: consistent,
-		Latencies:  latencies,
+		Quorum:            quorum,
+		AvgLatency:        avgLatency,
+		Consistent:        consistencyResult.IsConsistent,
+		ConsistentNodes:   consistencyResult.ConsistentNodes,
+		TotalNodes:        consistencyResult.TotalNodes,
+		InconsistentNodes: consistencyResult.InconsistentNodes,
+		Latencies:         latencies,
 	}
 }
 
-func checkConsistency(keys []string) bool {
-	log.Printf("DEBUG: Starting consistency check for %d keys", len(keys))
-	leader := NewClient("http://localhost:9000")
+type ConsistencyResult struct {
+	IsConsistent      bool
+	ConsistentNodes   int
+	TotalNodes        int
+	InconsistentNodes []int
+}
 
-	// Get leader state
+func checkConsistency(keys []string) ConsistencyResult {
+	leader := NewClient(LEADER_URL)
+
 	leaderData := make(map[string]string)
+	ctx := context.Background()
 	for _, key := range keys {
-		if value, err := leader.Get(key); err == nil && value != "" {
+		if value, err := leader.Get(ctx, key); err == nil && value != "" {
 			leaderData[key] = value
-		} else {
-			log.Printf("DEBUG: Key %s not found or empty on leader: %v", key, err)
 		}
 	}
 
-	log.Printf("DEBUG: Leader has %d keys with values", len(leaderData))
+	consistentNodes := 0
+	totalNodes := 0
+	var inconsistentNodes []int
 
-	// Check followers
 	for port := 9001; port <= 9005; port++ {
-		log.Printf("DEBUG: Checking consistency with follower on port %d", port)
 		follower := NewClient(fmt.Sprintf("http://localhost:%d", port))
 		inconsistentKeys := 0
+		totalNodes++
 
 		for key, expectedValue := range leaderData {
-			if value, err := follower.Get(key); err != nil || value != expectedValue {
-				log.Printf("ERROR: Inconsistency detected - key=%s leader_value='%s' follower_%d_value='%s' error=%v",
-					key, expectedValue, port, value, err)
+			if value, err := follower.Get(ctx, key); err != nil || value != expectedValue {
 				inconsistentKeys++
 			}
 		}
 
 		if inconsistentKeys > 0 {
-			log.Printf("ERROR: Follower %d has %d inconsistent keys out of %d total", port, inconsistentKeys, len(leaderData))
-			return false
+			inconsistentNodes = append(inconsistentNodes, port)
 		} else {
-			log.Printf("DEBUG: ✓ Follower %d is consistent", port)
+			consistentNodes++
 		}
 	}
 
-	log.Printf("INFO: ✓ All followers are consistent with leader")
-	return true
+	isConsistent := len(inconsistentNodes) == 0
+
+	return ConsistencyResult{
+		IsConsistent:      isConsistent,
+		ConsistentNodes:   consistentNodes,
+		TotalNodes:        totalNodes,
+		InconsistentNodes: inconsistentNodes,
+	}
 }
 
 func plotResults(results []Result) {
 	fmt.Println("\n=== ANALYSIS RESULTS ===")
-	fmt.Printf("%-8s | %-12s | %-12s\n", "Quorum", "Avg Lat (ms)", "Consistent")
-	fmt.Println("---------|--------------|------------")
+	fmt.Printf("%-8s | %-12s | %-18s | %-15s\n", "Quorum", "Avg Lat (ms)", "Consistency", "Nodes Status")
+	fmt.Println("---------|--------------|-------------------|----------------")
 
 	for _, r := range results {
-		status := "✓"
+		status := "✓ All consistent"
+		nodeStatus := fmt.Sprintf("%d/%d consistent", r.ConsistentNodes, r.TotalNodes)
+
 		if !r.Consistent {
-			status = "✗"
-		}
-		fmt.Printf("%-8d | %-12.2f | %-12s\n", r.Quorum, r.AvgLatency, status)
-	}
-
-	// ASCII plot
-	fmt.Println("\n=== LATENCY PLOT ===")
-	maxLat := 0.0
-	for _, r := range results {
-		if r.AvgLatency > maxLat {
-			maxLat = r.AvgLatency
-		}
-	}
-
-	for _, r := range results {
-		bars := int((r.AvgLatency / maxLat) * 40)
-		fmt.Printf("Q%d |", r.Quorum)
-		for i := 0; i < bars; i++ {
-			fmt.Print("█")
-		}
-		fmt.Printf(" %.1fms\n", r.AvgLatency)
-	}
-
-	// Analysis
-	fmt.Println("\n=== EXPLANATION ===")
-	fmt.Println("1. Latency vs Write Quorum:")
-	fmt.Println("   - Higher quorum = more followers must confirm = higher latency")
-	fmt.Println("   - Network delays (0-1000ms) add randomness to replication time")
-	fmt.Println("   - Semi-synchronous replication waits for required confirmations")
-
-	fmt.Println("\n2. Consistency Analysis:")
-	fmt.Println("   - Higher quorum values improve consistency guarantees")
-	fmt.Println("   - Some replicas may lag due to network delays")
-	fmt.Println("   - Semi-synchronous replication may allow temporary inconsistencies")
-
-	// Find trends
-	if len(results) > 1 {
-		increasing := true
-		for i := 1; i < len(results); i++ {
-			if results[i].AvgLatency <= results[i-1].AvgLatency {
-				increasing = false
-				break
+			status = "✗ Issues found"
+			if len(r.InconsistentNodes) > 0 {
+				nodeStatus = fmt.Sprintf("%d/%d (bad: %v)", r.ConsistentNodes, r.TotalNodes, r.InconsistentNodes)
 			}
 		}
-		if increasing {
-			fmt.Println("\n✓ Latency increases with quorum as expected")
-		} else {
-			fmt.Println("\n⚠ Latency trend is not monotonic (network variance)")
-		}
 
+		fmt.Printf("%-8d | %-12.2f | %-18s | %-15s\n", r.Quorum, r.AvgLatency, status, nodeStatus)
+	}
+
+	if len(results) > 1 {
 		consistentCount := 0
+		totalNodeTests := 0
+		totalConsistentNodes := 0
+
 		for _, r := range results {
 			if r.Consistent {
 				consistentCount++
 			}
+			totalNodeTests += r.TotalNodes
+			totalConsistentNodes += r.ConsistentNodes
 		}
-		fmt.Printf("✓ Consistency rate: %d/%d (%.0f%%)\n",
+
+		fmt.Printf("\nTest consistency rate: %d/%d tests (%.0f%%)\n",
 			consistentCount, len(results), float64(consistentCount)/float64(len(results))*100)
+		fmt.Printf("Overall node consistency: %d/%d nodes (%.1f%%)\n",
+			totalConsistentNodes, totalNodeTests, float64(totalConsistentNodes)/float64(totalNodeTests)*100)
 	}
 }
 
 func main() {
-	log.Println("INFO: ==========================================")
-	log.Println("INFO: KV Store Performance Analysis Starting")
-	log.Println("INFO: ==========================================")
-	log.Printf("INFO: Will test write quorum values 1-5")
-	log.Printf("INFO: Note: Manually ensure docker-compose is running with the correct WRITE_QUORUM value")
+	fmt.Println("KV Store Performance Analysis")
+	fmt.Println("Testing quorum values 1-5")
+
+	if err := verifyAdminAPI(); err != nil {
+		log.Fatalf("FATAL: Admin API not available: %v", err)
+	}
+
+	if err := verifyLeaderRole(); err != nil {
+		log.Fatalf("FATAL: Leader verification failed: %v", err)
+	}
 
 	var results []Result
 	for quorum := 1; quorum <= 5; quorum++ {
-		log.Printf("INFO: \n>>> TESTING QUORUM %d <<<", quorum)
 		result := runTest(quorum)
 		results = append(results, result)
-		log.Printf("INFO: Quorum %d test completed - avg_latency=%.2fms consistent=%v",
-			quorum, result.AvgLatency, result.Consistent)
+
+		consistencyInfo := fmt.Sprintf("%d/%d nodes consistent", result.ConsistentNodes, result.TotalNodes)
+		if !result.Consistent && len(result.InconsistentNodes) > 0 {
+			consistencyInfo += fmt.Sprintf(" (bad: %v)", result.InconsistentNodes)
+		}
+		fmt.Printf("Quorum %d: %.2fms avg latency, %s\n", quorum, result.AvgLatency, consistencyInfo)
 
 		if quorum < 5 {
-			log.Printf("INFO: Pausing 2 seconds before next test...")
 			time.Sleep(2 * time.Second)
 		}
 	}
 
-	// Save results
-	log.Printf("INFO: Saving results to results.json...")
 	if data, err := json.MarshalIndent(results, "", "  "); err == nil {
-		if err := os.WriteFile("results.json", data, 0644); err != nil {
-			log.Printf("ERROR: Failed to save results: %v", err)
-		} else {
-			log.Printf("INFO: ✓ Results saved successfully")
+		if err := os.WriteFile("results.json", data, 0644); err == nil {
+			fmt.Println("Results saved to results.json")
 		}
-	} else {
-		log.Printf("ERROR: Failed to marshal results: %v", err)
 	}
 
-	log.Printf("INFO: Generating analysis report...")
 	plotResults(results)
-
-	log.Println("INFO: ==========================================")
-	log.Println("INFO: ✓ Analysis complete. Results saved to results.json")
-	log.Println("INFO: ==========================================")
 }

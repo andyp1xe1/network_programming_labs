@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand/v2"
+	"sync"
 	"time"
 
 	"github.com/andyp1xe1/network_programming_labs/packages/lab4/common"
@@ -27,12 +28,19 @@ type LeaderConfig struct {
 type LeaderStore struct {
 	store.Store
 	config    LeaderConfig
+	configMu  sync.RWMutex
 	followers []store.Store
 	leaderID  string
 }
 
 func NewLeaderStore(store store.Store, config LeaderConfig, followers []store.Store, leaderID string) *LeaderStore {
-	return &LeaderStore{store, config, followers, leaderID}
+	return &LeaderStore{
+		Store:     store,
+		config:    config,
+		configMu:  sync.RWMutex{},
+		followers: followers,
+		leaderID:  leaderID,
+	}
 }
 
 func (kvs *LeaderStore) Set(ctx context.Context, key, value string) error {
@@ -84,7 +92,9 @@ func (kvs *LeaderStore) replicateToFollowers(operation func(store.Store) error) 
 	}
 
 	successCount := 0
+	kvs.configMu.RLock()
 	requiredConfirmations := min(kvs.config.CommitThreshold, len(kvs.followers))
+	kvs.configMu.RUnlock()
 	var errors []error
 	for i := 0; i < len(kvs.followers); i++ {
 		err := <-resultCh
@@ -106,4 +116,35 @@ func (kvs *LeaderStore) replicateToFollowers(operation func(store.Store) error) 
 		err = fmt.Errorf("unknown error during replication")
 	}
 	return fmt.Errorf("failed to achieve write quorum: %v", err)
+}
+
+// SetCommitThreshold updates the commit threshold (write quorum) dynamically
+func (kvs *LeaderStore) SetCommitThreshold(threshold int) error {
+	if threshold < 1 {
+		return fmt.Errorf("commit threshold must be at least 1, got %d", threshold)
+	}
+	if threshold > len(kvs.followers) {
+		return fmt.Errorf("commit threshold %d cannot exceed number of followers %d", threshold, len(kvs.followers))
+	}
+
+	kvs.configMu.Lock()
+	oldThreshold := kvs.config.CommitThreshold
+	kvs.config.CommitThreshold = threshold
+	kvs.configMu.Unlock()
+
+	log.Printf("LeaderStore: Updated commit threshold from %d to %d", oldThreshold, threshold)
+	return nil
+}
+
+// GetCommitThreshold returns the current commit threshold
+func (kvs *LeaderStore) GetCommitThreshold() int {
+	kvs.configMu.RLock()
+	threshold := kvs.config.CommitThreshold
+	kvs.configMu.RUnlock()
+	return threshold
+}
+
+// GetFollowerCount returns the number of configured followers
+func (kvs *LeaderStore) GetFollowerCount() int {
+	return len(kvs.followers)
 }
