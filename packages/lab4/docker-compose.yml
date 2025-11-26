@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  leader:
+    build: .
+    container_name: kvstore-leader
+    develop:
+      watch:
+        - action: rebuild
+          path: ./
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+    env_file:
+      - ".env"
+    environment:
+      - WRITE_QUORUM=${WRITE_QUORUM:-3}
+      - MIN_DELAY=${MIN_DELAY:-0}
+      - MAX_DELAY=${MAX_DELAY:-1000}
+      - LEADER_ID=${LEADER_ID:-kvstore-leader}
+    command: >
+      ./kvstore
+      -id=kvstore-leader
+      -leader=kvstore-leader
+      -followers=kvstore-follower1:8000,kvstore-follower2:8000,kvstore-follower3:8000,kvstore-follower4:8000,kvstore-follower5:8000
+      -commit-threshold=${WRITE_QUORUM:-3}
+      -min-delay=${MIN_DELAY:-0}
+      -max-delay=${MAX_DELAY:-1000}
+      -rpc-port=:8000
+      -http-port=:9000
+    networks:
+      - kvstore-network
+    depends_on:
+      - follower1
+      - follower2
+      - follower3
+      - follower4
+      - follower5
+
+  follower1:
+    build: .
+    container_name: kvstore-follower1
+    develop:
+      watch:
+        - action: rebuild
+          path: ./
+    ports:
+      - "8001:8000"
+      - "9001:9000"
+    env_file:
+      - ".env"
+    command: ./kvstore -id=kvstore-follower1 -leader=kvstore-leader -rpc-port=:8000 -http-port=:9000
+    networks:
+      - kvstore-network
+
+  follower2:
+    build: .
+    container_name: kvstore-follower2
+    develop:
+      watch:
+        - action: rebuild
+          path: ./
+    ports:
+      - "8002:8000"
+      - "9002:9000"
+    env_file:
+      - ".env"
+    command: ./kvstore -id=kvstore-follower2 -leader=kvstore-leader -rpc-port=:8000 -http-port=:9000
+    networks:
+      - kvstore-network
+
+  follower3:
+    build: .
+    container_name: kvstore-follower3
+    develop:
+      watch:
+        - action: rebuild
+          path: ./
+    ports:
+      - "8003:8000"
+      - "9003:9000"
+    env_file:
+      - ".env"
+    command: ./kvstore -id=kvstore-follower3 -leader=kvstore-leader -rpc-port=:8000 -http-port=:9000
+    networks:
+      - kvstore-network
+
+  follower4:
+    build: .
+    container_name: kvstore-follower4
+    develop:
+      watch:
+        - action: rebuild
+          path: ./
+    ports:
+      - "8004:8000"
+      - "9004:9000"
+    env_file:
+      - ".env"
+    command: ./kvstore -id=kvstore-follower4 -leader=kvstore-leader -rpc-port=:8000 -http-port=:9000
+    networks:
+      - kvstore-network
+
+  follower5:
+    build: .
+    container_name: kvstore-follower5
+    develop:
+      watch:
+        - action: rebuild
+          path: ./
+    ports:
+      - "8005:8000"
+      - "9005:9000"
+    env_file:
+      - ".env"
+    command: ./kvstore -id=kvstore-follower5 -leader=kvstore-leader -rpc-port=:8000 -http-port=:9000
+    networks:
+      - kvstore-network
+
+networks:
+  kvstore-network:
+    driver: bridge
