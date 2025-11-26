@@ -3,12 +3,10 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"log"
-	"net/http"
-	"strings"
-
 	"github.com/andyp1xe1/network_programming_labs/packages/lab4/common"
 	"github.com/andyp1xe1/network_programming_labs/packages/lab4/store"
+	"log"
+	"net/http"
 )
 
 // HTTPServer wraps a store.Store and exposes it via HTTP
@@ -62,11 +60,6 @@ func (s *HTTPServer) handleSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ID is required for set operations
-	if strings.Compare(req.ID, "") == 0 {
-		writeErrorResponse(w, "ID is required", http.StatusBadRequest)
-		return
-	}
 	ctx := common.CtxWithID(req.ID)
 
 	log.Printf("Set request: key=%s, value=%s, id=%s", req.Key, req.Value, req.ID)
@@ -117,11 +110,6 @@ func (s *HTTPServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ID is required for delete operations
-	if strings.Compare(req.ID, "") == 0 {
-		writeErrorResponse(w, "ID is required", http.StatusBadRequest)
-		return
-	}
 	ctx := common.CtxWithID(req.ID)
 
 	log.Printf("Delete request: key=%s, id=%s", req.Key, req.ID)

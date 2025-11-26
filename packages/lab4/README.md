@@ -32,13 +32,13 @@ docker-compose up (configurable via .env)
 
 ```bash
 # Set a key-value pair
-curl -s http://localhost:9000/set --json '{"key": "mykey", "value": "myvalue", "id": "nodeID"}'
+curl -s http://localhost:9000/set --json '{"key": "mykey", "value": "myvalue"}'
 
 # Get a value
 curl -s http://localhost:9000/get --json '{"key": "mykey"}'
 
 # Delete a key
-curl http://localhost:9000/delete --json '{"key": "mykey", "id": "nodeID"}'
+curl http://localhost:9000/delete --json '{"key": "mykey"}'
 ```
 
 ### 3. Run Integration Test
