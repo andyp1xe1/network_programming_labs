@@ -41,6 +41,19 @@ curl -s http://localhost:9000/get --json '{"key": "mykey"}'
 curl http://localhost:9000/delete --json '{"key": "mykey"}'
 ```
 
+### 4. Manage Write Quorum (Leader Only)
+
+```bash
+# Check current quorum configuration
+curl -s http://localhost:9000/admin/quorum
+
+# Set write quorum to 2 (requires 2 follower confirmations)  
+curl -s http://localhost:9000/admin/quorum --json '{"quorum": 2}'
+
+# Set write quorum to 5 (requires all 5 followers to confirm)
+curl -s http://localhost:9000/admin/quorum --json '{"quorum": 5}'
+```
+
 ### 3. Run Integration Test
 
 ```bash
@@ -50,14 +63,31 @@ curl http://localhost:9000/delete --json '{"key": "mykey"}'
 
 ## Performance Analysis
 
-Analyze write quorum performance and consistency:
+Analyze write quorum performance and consistency using the Python analysis script:
 
 ```bash
-# Run with cluster (manually set WRITE_QUORUM in .env for each test)
-go run ./cmd/analysis
+# Make sure the cluster is running first
+docker-compose up -d
+
+# Install Python dependencies (if needed)
+pip install requests matplotlib
+
+# Run comprehensive quorum analysis
+python analysis.py
 ```
 
-The analysis tool tests quorum values 1-5, measures latency, and verifies consistency across all nodes.
+The analysis tool automatically tests quorum values 1-5, measures write latency, and verifies consistency across all nodes. Results are saved to `analysis_results.png`.
+
+### Analysis Results
+
+![Quorum Analysis Results](analysis_results.png)
+
+The plot shows the trade-off between write latency and consistency:
+- **Quorum 1**: Fastest writes (216ms) but no consistency guarantees (0%)  
+- **Quorum 2**: Moderate latency (362ms) with basic consistency (20%)
+- **Quorum 3**: Balanced approach (542ms) with decent consistency (40%)
+- **Quorum 4**: Higher latency (741ms) but strong consistency (80%)
+- **Quorum 5**: Slowest writes (888ms) but full consistency (100%)
 
 ## Testing
 
@@ -117,6 +147,7 @@ Configure the system using environment variables in .env:
 
 - Go 1.25.3 or later
 - Docker and Docker Compose (for containerized deployment)
+- Python 3.x with `requests` and `matplotlib` libraries (for performance analysis)
 - jq (for integration tests)
 
 ## API Endpoints
@@ -127,10 +158,53 @@ Configure the system using environment variables in .env:
 - `POST /delete` - Delete key
 - `POST /exists` - Check if key exists
 - `GET /status` - Health check endpoint
+- `GET /admin/quorum` - Get current quorum configuration (leader only)
+- `POST /admin/quorum` - Update write quorum (leader only)
 
 ### Follower Nodes (localhost:9001-9005)
 - Same endpoints as leader, but writes will be rejected unless made from a leader
 - Reads are served from local replica
+
+## Quorum API Details
+
+### Get Quorum Status
+**Endpoint:** `GET /admin/quorum` (Leader only)
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "current_quorum": 3,
+    "max_followers": 5,
+    "active_followers": 5
+  }
+}
+```
+
+### Update Write Quorum  
+**Endpoint:** `POST /admin/quorum` (Leader only)
+
+**Request:**
+```json
+{
+  "quorum": 2
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "current_quorum": 2,
+    "max_followers": 5,
+    "active_followers": 5
+  }
+}
+```
+
+**Valid quorum values:** 1-5 (must not exceed the number of available followers)
 
 ## Architecture Details
 
@@ -160,9 +234,9 @@ lab4/
 ├── Dockerfile
 ├── README.md
 ├── .env
+├── analysis.py
+├── analysis_results.png         # Generated analysis plot
 ├── cmd/
-│   ├── analysis/
-│   │   └── analysis.go
 │   └── kvstore/
 │       └── main.go
 ├── common/
