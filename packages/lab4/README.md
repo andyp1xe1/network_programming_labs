@@ -25,11 +25,7 @@ A distributed key-value store implementation with single-leader replication usin
 ### 1. Start the Cluster
 
 ```bash
-# Use default configuration (write quorum = 3)
-docker-compose up
-
-# Or with custom configuration (supports .env)
-WRITE_QUORUM=2 MIN_DELAY=100 MAX_DELAY=500 docker-compose up --build
+docker-compose up (configurable via .env)
 ```
 
 ### 2. Test Basic Operations
@@ -51,20 +47,61 @@ curl http://localhost:9000/delete --json '{"key": "mykey", "id": "nodeID"}'
 # Make sure the cluster is running, then:
 ./test/integration_test.sh
 ```
+
+## Performance Analysis
+
+Analyze write quorum performance and consistency:
+
+```bash
+# Run with cluster (manually set WRITE_QUORUM in .env for each test)
+go run ./cmd/analysis
 ```
 
+The analysis tool tests quorum values 1-5, measures latency, and verifies consistency across all nodes.
+
+## Testing
+
+### Integration Tests
+```bash
+./test/integration_test.sh    # Full end-to-end cluster testing
+```
+
+### Unit Tests
+```bash
+go test ./test/               # Run all unit tests
+go test ./test/ -v            # Verbose output
+```
+
+## Manual Setup
 
 If you dont want docker
 ```bash
 # Build the application
 go build -o kvstore ./cmd/kvstore
 
-# Run leader
-./kvstore -id=leader -leader=leader -followers=localhost:8001,localhost:8002
+# Run leader with all CLI options
+./kvstore -id=leader -leader=leader \
+  -followers=localhost:8001,localhost:8002,localhost:8003 \
+  -commit-threshold=2 -min-delay=0 -max-delay=1000 \
+  -rpc-port=:8000 -http-port=:9000
 
 # Run follower
-./kvstore -id=follower1 -leader=leader
+./kvstore -id=follower1 -leader=leader \
+  -rpc-port=:8001 -http-port=:9001
 ```
+
+### CLI Arguments
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-id` | "" | Node identifier |
+| `-leader` | "" | Leader node ID |
+| `-followers` | "" | Comma-separated follower addresses |
+| `-commit-threshold` | 1 | Write quorum size |
+| `-min-delay` | 0 | Minimum replication delay (ms) |
+| `-max-delay` | 0 | Maximum replication delay (ms) |
+| `-rpc-port` | ":8000" | RPC server port |
+| `-http-port` | ":9000" | HTTP server port |
 
 ## Configuration
 
@@ -76,6 +113,12 @@ Configure the system using environment variables in .env:
 | `MIN_DELAY` | 0 | Minimum network delay in milliseconds |
 | `MAX_DELAY` | 1000 | Maximum network delay in milliseconds |
 
+## Requirements
+
+- Go 1.25.3 or later
+- Docker and Docker Compose (for containerized deployment)
+- jq (for integration tests)
+
 ## API Endpoints
 
 ### Leader Node (localhost:9000)
@@ -83,6 +126,7 @@ Configure the system using environment variables in .env:
 - `POST /get` - Get value by key
 - `POST /delete` - Delete key
 - `POST /exists` - Check if key exists
+- `GET /status` - Health check endpoint
 
 ### Follower Nodes (localhost:9001-9005)
 - Same endpoints as leader, but writes will be rejected unless made from a leader
@@ -110,39 +154,38 @@ Each replication request includes a random delay to simulate real network condit
 ### Project Structure
 
 ```
-lab4 $ tree
-.
+lab4/
 ├── go.mod
 ├── docker-compose.yml
 ├── Dockerfile
 ├── README.md
-├── cmd
-│   ├── analysis
-│   │   └── analysis.go
-│   └── kvstore
-│       └── main.go
-├── common
-│   └── types.go
-├── follower
-│   ├── store.go
-│   └── types.go
-├── http
-│   ├── client.go
-│   ├── http.go
-│   └── types.go
-├── kv
-│   ├── common
-│   └── kv.go
-├── leader
-│   └── leader.go
-├── rpc
-│   ├── client.go
-│   ├── rpc.go
-│   └── types.go
-├── store
-│   ├── mapstore.go
-│   └── store.go
-└── test
+├── .env
+├── cmd/
+│   ├── analysis/
+│   │   └── analysis.go
+│   └── kvstore/
+│       └── main.go
+├── common/
+│   └── types.go
+├── follower/
+│   ├── store.go
+│   └── types.go
+├── http/
+│   ├── client.go
+│   ├── http.go
+│   └── types.go
+├── kv/
+│   └── kv.go
+├── leader/
+│   └── leader.go
+├── rpc/
+│   ├── client.go
+│   ├── rpc.go
+│   └── types.go
+├── store/
+│   ├── mapstore.go
+│   └── store.go
+└── test/
     ├── http_test.go
     ├── integration_test.sh
     └── leader_test.go
