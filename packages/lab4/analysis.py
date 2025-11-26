@@ -8,7 +8,8 @@ import numpy as np
 LEADER_URL = "http://localhost:9000"
 FOLLOWER_PORTS = [9001, 9002, 9003, 9004, 9005]
 
-KEYS=11
+KEYS = 10
+
 
 def set_quorum(quorum):
     try:
@@ -78,8 +79,26 @@ def run_test(quorum):
             if success:
                 latencies.append(duration)
 
-    avg_latency = np.mean(latencies) if latencies else 0
-    print(f"Writes: {len(latencies)}/100, avg latency: {avg_latency:.1f}ms")
+    # Calculate latency statistics
+    if latencies:
+        latency_stats = {
+            "mean": np.mean(latencies),
+            "median": np.median(latencies),
+            "p95": np.percentile(latencies, 95),
+            "p99": np.percentile(latencies, 99),
+            "min": np.min(latencies),
+            "max": np.max(latencies),
+        }
+    else:
+        latency_stats = {
+            stat: 0 for stat in ["mean", "median", "p95", "p99", "min", "max"]
+        }
+
+    print(f"Writes: {len(latencies)}/100")
+    print(
+        f"  Mean: {latency_stats['mean']:.1f}ms, Median: {latency_stats['median']:.1f}ms"
+    )
+    print(f"  P95: {latency_stats['p95']:.1f}ms, P99: {latency_stats['p99']:.1f}ms")
 
     time.sleep(4)  # Replication settlement
 
@@ -88,9 +107,10 @@ def run_test(quorum):
 
     return {
         "quorum": quorum,
-        "latency": avg_latency,
+        "latency_stats": latency_stats,
         "accuracy": accuracy,
         "writes": len(latencies),
+        "raw_latencies": latencies,  # Keep raw data for analysis
     }
 
 
@@ -106,11 +126,16 @@ def main():
 
     # Extract data
     quorums = [r["quorum"] for r in results]
-    latencies = [r["latency"] for r in results]
     accuracies = [r["accuracy"] * 100 for r in results]
 
+    # Extract latency statistics
+    mean_latencies = [r["latency_stats"]["mean"] for r in results]
+    median_latencies = [r["latency_stats"]["median"] for r in results]
+    p95_latencies = [r["latency_stats"]["p95"] for r in results]
+    p99_latencies = [r["latency_stats"]["p99"] for r in results]
+
     # Plot results
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
     # Accuracy vs Quorum
     axes[0].plot(quorums, accuracies, "bo-", linewidth=2, markersize=8)
@@ -120,23 +145,47 @@ def main():
     axes[0].grid(True, alpha=0.3)
     axes[0].set_ylim(0, 105)
 
-    # Latency vs Quorum
-    axes[1].plot(quorums, latencies, "ro-", linewidth=2, markersize=8)
+    # Latency vs Quorum - Multiple metrics overlapped
+    axes[1].plot(
+        quorums,
+        mean_latencies,
+        "ro-",
+        linewidth=2,
+        markersize=6,
+        label="Mean",
+        alpha=0.8,
+    )
+    axes[1].plot(
+        quorums,
+        median_latencies,
+        "go-",
+        linewidth=2,
+        markersize=6,
+        label="Median",
+        alpha=0.8,
+    )
+    axes[1].plot(
+        quorums, p95_latencies, "mo-", linewidth=2, markersize=6, label="P95", alpha=0.8
+    )
+    axes[1].plot(
+        quorums, p99_latencies, "co-", linewidth=2, markersize=6, label="P99", alpha=0.8
+    )
     axes[1].set_xlabel("Write Quorum")
     axes[1].set_ylabel("Latency (ms)")
-    axes[1].set_title("Latency vs Quorum")
+    axes[1].set_title("Latency Metrics vs Quorum")
     axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
 
-    # Accuracy vs Latency
-    axes[2].scatter(latencies, accuracies, c=quorums, s=100, cmap="viridis")
-    axes[2].set_xlabel("Latency (ms)")
+    # Accuracy vs Latency (using mean latency)
+    axes[2].scatter(mean_latencies, accuracies, c=quorums, s=100, cmap="viridis")
+    axes[2].set_xlabel("Mean Latency (ms)")
     axes[2].set_ylabel("Consistency (%)")
-    axes[2].set_title("Consistency vs Latency")
+    axes[2].set_title("Consistency vs Mean Latency")
     axes[2].grid(True, alpha=0.3)
     for i, q in enumerate(quorums):
         axes[2].annotate(
             f"Q{q}",
-            (latencies[i], accuracies[i]),
+            (mean_latencies[i], accuracies[i]),
             xytext=(5, 5),
             textcoords="offset points",
             fontsize=10,
@@ -149,8 +198,10 @@ def main():
     # Print summary
     print("\nSummary:")
     for r in results:
+        stats = r["latency_stats"]
         print(
-            f"Quorum {r['quorum']}: {r['latency']:.1f}ms latency, {r['accuracy'] * 100:.1f}% consistency"
+            f"Quorum {r['quorum']}: Mean {stats['mean']:.1f}ms, Median {stats['median']:.1f}ms, "
+            f"P95 {stats['p95']:.1f}ms, P99 {stats['p99']:.1f}ms, {r['accuracy'] * 100:.1f}% consistency"
         )
 
 

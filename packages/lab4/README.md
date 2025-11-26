@@ -82,12 +82,36 @@ The analysis tool automatically tests quorum values 1-5, measures write latency,
 
 ![Quorum Analysis Results](analysis_results.png)
 
-The plot shows the trade-off between write latency and consistency:
-- **Quorum 1**: Fastest writes (216ms) but no consistency guarantees (0%)  
-- **Quorum 2**: Moderate latency (362ms) with basic consistency (20%)
-- **Quorum 3**: Balanced approach (542ms) with decent consistency (40%)
-- **Quorum 4**: Higher latency (741ms) but strong consistency (80%)
-- **Quorum 5**: Slowest writes (888ms) but full consistency (100%)
+The plot shows comprehensive latency metrics and their trade-offs with consistency across different quorum sizes:
+
+### Latency Metrics Explained
+
+- **Mean**: Average latency across all write operations - shows typical performance
+- **Median (P50)**: Middle value when latencies are sorted - less affected by outliers  
+- **P95**: 95% of writes complete faster than this time - captures most user experience
+- **P99**: 99% of writes complete faster than this time - shows worst-case scenarios
+
+### Performance Analysis Results
+
+- **Quorum 1**: Fast writes (Mean: 231.0ms, P95: 528.8ms) but no consistency (0%)
+- **Quorum 2**: Moderate performance (Mean: 334.2ms, P95: 629.9ms) with limited consistency (20%)  
+- **Quorum 3**: Balanced approach (Mean: 575.0ms, P95: 855.4ms) with good consistency (60%)
+- **Quorum 4**: Higher latency (Mean: 720.1ms, P95: 972.8ms) with strong consistency (80%)
+- **Quorum 5**: Highest latency (Mean: 904.0ms, P95: 1055.0ms) with strong consistency (80%)
+
+The overlapped latency graph shows how different percentiles behave as quorum size increases.
+
+### Test Methodology
+
+The analysis performs **100 write operations** using **10 concurrent threads** across **10 unique keys**. This creates realistic race conditions where multiple threads may write to the same key simultaneously, simulating real-world concurrent access patterns.
+
+### Understanding Consistency Results
+
+The consistency percentages reflect race conditions inherent in distributed systems under concurrent load. When 10 threads write simultaneously to the same set of keys, they create natural race conditions where multiple operations compete for the same resources. The random network delays of 0-1000ms further complicate this by causing unpredictable write ordering across different nodes in the cluster.
+
+The system uses a last-writer-wins approach, meaning the final value for any key depends on which write operation completes last across all nodes. Higher quorum values reduce but cannot completely eliminate inconsistency under concurrent load because they cannot control the fundamental timing issues that arise when multiple threads access shared data simultaneously.
+
+Alternative conflict resolution approaches could eliminate these race conditions: **versioning** (like DynamoDB's conditional writes where clients must specify expected version numbers) or **serialization** (like Redis where writes are processed sequentially in a single thread). However, both trade performance for consistency.
 
 ## Testing
 

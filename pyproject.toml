@@ -8,4 +8,4 @@ dependencies = []
 
 [tool.uv.workspace]
 members = ["packages/*"]
-exclude = ["packages/www", "packages/lab3"]
+exclude = ["packages/www", "packages/lab3", "packages/lab4"]

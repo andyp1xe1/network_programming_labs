@@ -8,3 +8,6 @@ Multi-threaded server demonstrating concurrency concepts, race conditions, and t
 
 ## [Lab 3: Memory Scramble Game Server](./packages/lab3/)
 Advanced concurrent game server implementing MIT 6.102 PS4 specification. Features real-time multi-player support, comprehensive ADT design, and web interface. Built with Go.
+
+## [Lab 4: Distributed Key-Value Store](./packages/lab4/)
+Distributed key-value store with leader-follower architecture. Features HTTP and RPC communication protocols, data replication. Built with Go.
