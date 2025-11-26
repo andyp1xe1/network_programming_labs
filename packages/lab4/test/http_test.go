@@ -22,7 +22,7 @@ func TestHTTPEndpoints(t *testing.T) {
 		MaxDelay:        time.Millisecond * 10,
 		MinDelay:        time.Millisecond * 1,
 	}
-	leaderStore := leader.NewLeaderStore(baseStore, config, []leader.KVClient{}, "test-leader")
+	leaderStore := leader.NewLeaderStore(baseStore, config, []store.Store{}, "test-leader")
 
 	// Create HTTP handler
 	handler := kvhttp.NewHTTPServer(leaderStore)
@@ -85,7 +85,7 @@ func TestHTTPConcurrentOperations(t *testing.T) {
 		MaxDelay:        time.Millisecond * 5,
 		MinDelay:        time.Millisecond * 1,
 	}
-	leaderStore := leader.NewLeaderStore(baseStore, config, []leader.KVClient{}, "test-leader")
+	leaderStore := leader.NewLeaderStore(baseStore, config, []store.Store{}, "test-leader")
 
 	handler := kvhttp.NewHTTPServer(leaderStore)
 

@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -17,7 +18,7 @@ type mockFollower struct {
 	fail bool
 }
 
-func (m *mockFollower) Set(id, key, value string) error {
+func (m *mockFollower) Set(ctx context.Context, key, value string) error {
 	if m.fail {
 		return fmt.Errorf("simulated follower failure")
 	}
@@ -28,19 +29,32 @@ func (m *mockFollower) Set(id, key, value string) error {
 	return nil
 }
 
-func (m *mockFollower) Get(key string) (string, error) {
-	return m.data[key], nil
+func (m *mockFollower) Get(ctx context.Context, key string) (string, error) {
+	if m.data == nil {
+		return "", fmt.Errorf("key not found")
+	}
+	value, exists := m.data[key]
+	if !exists {
+		return "", fmt.Errorf("key not found")
+	}
+	return value, nil
 }
 
-func (m *mockFollower) Delete(id, key string) error {
+func (m *mockFollower) Delete(ctx context.Context, key string) error {
 	if m.fail {
 		return fmt.Errorf("simulated follower failure")
+	}
+	if m.data == nil {
+		return fmt.Errorf("key not found")
 	}
 	delete(m.data, key)
 	return nil
 }
 
-func (m *mockFollower) Exists(key string) (bool, error) {
+func (m *mockFollower) Exists(ctx context.Context, key string) (bool, error) {
+	if m.data == nil {
+		return false, nil
+	}
 	_, exists := m.data[key]
 	return exists, nil
 }
@@ -54,7 +68,7 @@ func TestLeaderReplication(t *testing.T) {
 	follower2 := &mockFollower{}
 	follower3 := &mockFollower{fail: true} // This one will "fail"
 
-	followers := []leader.KVClient{follower1, follower2, follower3}
+	followers := []store.Store{follower1, follower2, follower3}
 
 	config := leader.LeaderConfig{
 		CommitThreshold: 2, // Need 2 confirmations
@@ -110,7 +124,7 @@ func TestLeaderReplicationQuorum(t *testing.T) {
 	follower2 := &mockFollower{fail: true}
 	follower3 := &mockFollower{fail: true}
 
-	followers := []leader.KVClient{follower1, follower2, follower3}
+	followers := []store.Store{follower1, follower2, follower3}
 
 	config := leader.LeaderConfig{
 		CommitThreshold: 3, // Need 3 confirmations but only 1 working
