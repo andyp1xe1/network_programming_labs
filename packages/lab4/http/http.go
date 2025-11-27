@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
@@ -69,16 +70,29 @@ func (s *HTTPServer) handleSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := common.CtxWithID(req.ID)
+	ctx = common.CtxWithExpectedVersion(ctx, req.ExpectedVersion)
 
 	log.Printf("Set request: key=%s, value=%s, id=%s", req.Key, req.Value, req.ID)
 	err := s.store.Set(ctx, req.Key, req.Value)
 	if err != nil {
 		log.Printf("Set error: %v", err)
-		writeErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		if errors.Is(err, store.ErrorVersionConflict) {
+			writeErrorResponse(w, err.Error(), http.StatusConflict)
+		} else {
+			writeErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
-	writeSuccessResponse(w, Response{Success: true})
+	resp := Response{Success: true}
+
+	if metaStore, ok := s.store.(store.MetadataStore); ok {
+		if meta, exists := metaStore.GetMeta(req.Key); exists {
+			resp.Metadata = meta
+		}
+	}
+
+	writeSuccessResponse(w, resp)
 }
 
 func (s *HTTPServer) handleGet(w http.ResponseWriter, r *http.Request) {
@@ -99,10 +113,19 @@ func (s *HTTPServer) handleGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeSuccessResponse(w, Response{
+	resp := Response{
 		Success: true,
 		Value:   value,
-	})
+	}
+
+	// Include metadata if the store supports it
+	if metaStore, ok := s.store.(store.MetadataStore); ok {
+		if meta, exists := metaStore.GetMeta(req.Key); exists {
+			resp.Metadata = meta
+		}
+	}
+
+	writeSuccessResponse(w, resp)
 }
 
 func (s *HTTPServer) handleDelete(w http.ResponseWriter, r *http.Request) {
@@ -119,12 +142,18 @@ func (s *HTTPServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := common.CtxWithID(req.ID)
+	ctx = common.CtxWithExpectedVersion(ctx, req.ExpectedVersion)
 
 	log.Printf("Delete request: key=%s, id=%s", req.Key, req.ID)
 	err := s.store.Delete(ctx, req.Key)
 	if err != nil {
 		log.Printf("Delete error: %v", err)
-		writeErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		// Check if this is a version conflict error
+		if errors.Is(err, store.ErrorVersionConflict) {
+			writeErrorResponse(w, err.Error(), http.StatusConflict)
+		} else {
+			writeErrorResponse(w, err.Error(), http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -149,14 +178,21 @@ func (s *HTTPServer) handleExists(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	response := map[string]any{
-		"success": true,
-		"exists":  exists,
+	resp := Response{
+		Success: true,
+		Exists:  exists,
 	}
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Failed to encode exists response: %v", err)
+
+	// Include metadata if the store supports it and the key exists
+	if exists {
+		if metaStore, ok := s.store.(store.MetadataStore); ok {
+			if meta, hasM := metaStore.GetMeta(req.Key); hasM {
+				resp.Metadata = meta
+			}
+		}
 	}
+
+	writeSuccessResponse(w, resp)
 }
 
 func (s *HTTPServer) handleStatus(w http.ResponseWriter, r *http.Request) {

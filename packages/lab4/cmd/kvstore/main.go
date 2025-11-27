@@ -2,6 +2,8 @@ package main
 
 import (
 	"flag"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,16 +20,24 @@ func main() {
 	commitThreshold := flag.Int("commit-threshold", 1, "Quorum commit threshold")
 	maxDelay := flag.Int("max-delay", 0, "Maximum network delay in milliseconds")
 	minDelay := flag.Int("min-delay", 0, "Minimum network delay in milliseconds")
+	versioned := flag.Bool("versioned", false, "Enable versioned store for optimistic concurrency control")
 	rpcPort := flag.String("rpc-port", ":8000", "RPC server port")
 	httpPort := flag.String("http-port", ":9000", "HTTP server port")
 	flag.Parse()
 
+	if envVersioned := os.Getenv("VERSIONED"); envVersioned != "" {
+		if val, err := strconv.ParseBool(envVersioned); err == nil {
+			*versioned = val
+		}
+	}
+
 	isLeader := strings.Compare(*id, *leaderID) == 0 || strings.Compare(*leaderID, "") == 0
 
 	conf := kv.KVserverConfig{
-		RPCPort:  *rpcPort,
-		HTTPPort: *httpPort,
-		ID:       *id,
+		RPCPort:   *rpcPort,
+		HTTPPort:  *httpPort,
+		Versioned: *versioned,
+		ID:        *id,
 	}
 
 	var kvServer kv.KV

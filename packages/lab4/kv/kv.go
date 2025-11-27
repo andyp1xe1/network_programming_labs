@@ -15,8 +15,9 @@ import (
 )
 
 type KVserverConfig struct {
-	RPCPort  string
-	HTTPPort string
+	RPCPort   string
+	HTTPPort  string
+	Versioned bool
 
 	ID string
 }
@@ -40,7 +41,11 @@ type KV struct {
 }
 
 func NewFollowerKV(config KVFollowerConfig) KV {
-	f := follower.NewFollowerStore(store.NewMapStore(), config.ID, config.LeaderID)
+	var baseStore store.Store = store.NewMapStore()
+	if config.Versioned {
+		baseStore = store.NewVStore(baseStore)
+	}
+	f := follower.NewFollowerStore(baseStore, config.ID, config.LeaderID)
 	return KV{f, config.KVserverConfig}
 }
 
@@ -54,12 +59,17 @@ func NewLeaderKV(config KVLeaderConfig) KV {
 		followers = append(followers, followerStore)
 	}
 
+	var baseStore store.Store = store.NewMapStore()
+	if config.Versioned {
+		baseStore = store.NewVStore(baseStore)
+	}
+
 	lConf := leader.LeaderConfig{
 		CommitThreshold: config.CommitThreshold,
 		MaxDelay:        config.MaxDelay,
 		MinDelay:        config.MinDelay,
 	}
-	l := leader.NewLeaderStore(store.NewMapStore(), lConf, followers, config.ID)
+	l := leader.NewLeaderStore(baseStore, lConf, followers, config.ID)
 	return KV{l, config.KVserverConfig}
 }
 

@@ -33,6 +33,7 @@ func ExposeRPC(st store.Store, address string) error {
 
 func (kvrpc *KVrpc) Set(args *SetArgs, reply *SetReply) error {
 	ctx := common.CtxWithID(args.ID)
+	ctx = common.CtxWithVersion(ctx, args.Version)
 	return kvrpc.Store.Set(ctx, args.Key, args.Value)
 }
 
@@ -47,6 +48,7 @@ func (kvrpc *KVrpc) Get(args *GetArgs, reply *GetReply) error {
 
 func (kvrpc *KVrpc) Delete(args *DeleteArgs, reply *DeleteReply) error {
 	ctx := common.CtxWithID(args.ID)
+	ctx = common.CtxWithVersion(ctx, args.Version)
 	return kvrpc.Store.Delete(ctx, args.Key)
 }
 

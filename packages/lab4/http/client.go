@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/andyp1xe1/network_programming_labs/packages/lab4/common"
 )
 
 // HTTPClient implements the store.Store interface over HTTP
@@ -29,7 +31,14 @@ func NewHTTPClient(baseURL, clientID string) *HTTPClient {
 
 // Set implements store.Store.Set over HTTP
 func (c *HTTPClient) Set(ctx context.Context, key, value string) error {
-	req := SetRequest{key, value, c.clientID}
+	expectedVersion, _ := common.ExpectedVersionFromCtx(ctx)
+
+	req := SetRequest{
+		Key:             key,
+		Value:           value,
+		ExpectedVersion: expectedVersion,
+		ID:              c.clientID,
+	}
 
 	var resp Response
 	if err := c.makeRequest(ctx, "POST", "/set", req, &resp); err != nil {
@@ -61,7 +70,12 @@ func (c *HTTPClient) Get(ctx context.Context, key string) (string, error) {
 
 // Delete implements store.Store.Delete over HTTP
 func (c *HTTPClient) Delete(ctx context.Context, key string) error {
-	req := DeleteRequest{key, c.clientID}
+	expectedVersion, _ := common.ExpectedVersionFromCtx(ctx)
+	req := DeleteRequest{
+		Key:             key,
+		ExpectedVersion: expectedVersion,
+		ID:              c.clientID,
+	}
 
 	var resp Response
 	if err := c.makeRequest(ctx, "POST", "/delete", req, &resp); err != nil {

@@ -34,11 +34,17 @@ docker-compose up (configurable via .env)
 # Set a key-value pair
 curl -s http://localhost:9000/set --json '{"key": "mykey", "value": "myvalue"}'
 
-# Get a value
+# Set with version (optimistic locking)
+curl -s http://localhost:9000/set --json '{"key": "mykey", "value": "myvalue", "version": 1}'
+
+# Get a value (returns value and version metadata)
 curl -s http://localhost:9000/get --json '{"key": "mykey"}'
 
 # Delete a key
 curl http://localhost:9000/delete --json '{"key": "mykey"}'
+
+# Delete with version (optimistic locking)
+curl http://localhost:9000/delete --json '{"key": "mykey", "version": 2}'
 ```
 
 ### 4. Manage Write Quorum (Leader Only)
@@ -74,6 +80,9 @@ pip install requests matplotlib
 
 # Run comprehensive quorum analysis
 python analysis.py
+
+# Run versioned analysis (with optimistic locking)
+python versioned_analysis.py
 ```
 
 The analysis tool automatically tests quorum values 1-5, measures write latency, and verifies consistency across all nodes. Results are saved to `analysis_results.png`.
@@ -113,11 +122,33 @@ The system uses a last-writer-wins approach, meaning the final value for any key
 
 Alternative conflict resolution approaches could eliminate these race conditions: **versioning** (like DynamoDB's conditional writes where clients must specify expected version numbers) or **serialization** (like Redis where writes are processed sequentially in a single thread). However, both trade performance for consistency.
 
+## Versioned Implementation Results
+
+To address consistency issues, an optimistic locking approach was implemented using version numbers:
+
+1. **Initial Fix**: Setting follower versions to match leader versions solved application-level races but not network/replication-level conflicts
+2. **Improved Fix**: Dropping older versions during replication eliminated network-level race conditions
+
+### Versioned Analysis Results
+
+![Versioned Analysis Results](versioned_analysis_results.png)
+
+The versioned implementation achieves **100% consistency** across all quorum levels while maintaining similar performance characteristics:
+
+- **Quorum 1**: Mean: 235.4ms, P95: 427.2ms - 100% consistency
+- **Quorum 2**: Mean: 415.5ms, P95: 752.7ms - 100% consistency  
+- **Quorum 3**: Mean: 542.1ms, P95: 863.7ms - 100% consistency
+- **Quorum 4**: Mean: 735.6ms, P95: 979.7ms - 100% consistency
+- **Quorum 5**: Mean: 892.8ms, P95: 1049.5ms - 100% consistency
+
+The versioned approach successfully eliminates race conditions by rejecting writes with outdated version numbers, ensuring all nodes converge to the same final state regardless of network timing variations.
+
 ## Testing
 
 ### Integration Tests
 ```bash
-./test/integration_test.sh    # Full end-to-end cluster testing
+./test/integration_test.sh                    # Full end-to-end cluster testing
+./test/versioning_integration_test.sh         # Versioned store integration testing
 ```
 
 ### Unit Tests
@@ -154,8 +185,11 @@ go build -o kvstore ./cmd/kvstore
 | `-commit-threshold` | 1 | Write quorum size |
 | `-min-delay` | 0 | Minimum replication delay (ms) |
 | `-max-delay` | 0 | Maximum replication delay (ms) |
+| `-versioned` | false | Enable versioned store for optimistic locking |
 | `-rpc-port` | ":8000" | RPC server port |
 | `-http-port` | ":9000" | HTTP server port |
+
+**Note:** The `VERSIONED` environment variable overrides the `-versioned` flag when set.
 
 ## Configuration
 
@@ -166,6 +200,7 @@ Configure the system using environment variables in .env:
 | `WRITE_QUORUM` | 3 | Number of follower confirmations required (1-5) |
 | `MIN_DELAY` | 0 | Minimum network delay in milliseconds |
 | `MAX_DELAY` | 1000 | Maximum network delay in milliseconds |
+| `VERSIONED` | 0 | Enable versioning for optimistic locking (1=enabled, 0=disabled) |
 
 ## Requirements
 

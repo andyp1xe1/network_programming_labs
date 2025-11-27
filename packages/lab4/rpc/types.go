@@ -1,9 +1,10 @@
 package rpc
 
 type SetArgs struct {
-	ID    string
-	Key   string
-	Value string
+	ID      string
+	Key     string
+	Version int
+	Value   string
 }
 
 type SetReply struct{}
@@ -17,8 +18,9 @@ type GetReply struct {
 }
 
 type DeleteArgs struct {
-	ID  string
-	Key string
+	ID      string
+	Key     string
+	Version int
 }
 
 type DeleteReply struct{}

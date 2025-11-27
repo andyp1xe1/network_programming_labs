@@ -3,9 +3,10 @@ package http
 
 // SetRequest JSON request structures
 type SetRequest struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-	ID    string `json:"id,omitempty"`
+	Key             string `json:"key"`
+	Value           string `json:"value"`
+	ExpectedVersion int    `json:"expected_version,omitempty"`
+	ID              string `json:"id,omitempty"`
 }
 
 type GetRequest struct {
@@ -13,8 +14,9 @@ type GetRequest struct {
 }
 
 type DeleteRequest struct {
-	Key string `json:"key"`
-	ID  string `json:"id,omitempty"`
+	Key             string `json:"key"`
+	ExpectedVersion int    `json:"expected_version,omitempty"`
+	ID              string `json:"id,omitempty"`
 }
 
 type ExistsRequest struct {
@@ -23,11 +25,12 @@ type ExistsRequest struct {
 
 // Response JSON response structure
 type Response struct {
-	Success bool   `json:"success"`
-	Value   string `json:"value,omitempty"`
-	Exists  bool   `json:"exists,omitempty"`
-	Error   string `json:"error,omitempty"`
-	Data    any    `json:"data,omitempty"`
+	Success  bool   `json:"success"`
+	Value    string `json:"value,omitempty"`
+	Exists   bool   `json:"exists,omitempty"`
+	Error    string `json:"error,omitempty"`
+	Data     any    `json:"data,omitempty"`
+	Metadata any    `json:"metadata,omitempty"`
 }
 
 // QuorumManager interface for dynamic quorum configurationtype

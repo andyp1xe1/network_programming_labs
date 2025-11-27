@@ -41,7 +41,10 @@ func (kvf *FollowerStore) Set(ctx context.Context, key, value string) error {
 	if err := kvf.checkLeader(ctx); err != nil {
 		return err
 	}
-	kvf.Store.Set(ctx, key, value)
+	if err := kvf.Store.Set(ctx, key, value); err != nil {
+		log.Printf("Follower %s: Failed to set key=%s value=%s: %v", kvf.ID, key, value, err)
+		return err
+	}
 	log.Printf("Follower %s: Set key=%s value=%s", kvf.ID, key, value)
 	return nil
 }
@@ -52,6 +55,7 @@ func (kvf *FollowerStore) Delete(ctx context.Context, key string) error {
 	}
 	err := kvf.Store.Delete(ctx, key)
 	if err != nil {
+		log.Printf("Follower %s: Failed to delete key=%s: %v", kvf.ID, key, err)
 		return err
 	}
 	log.Printf("Follower %s: Delete key=%s", kvf.ID, key)

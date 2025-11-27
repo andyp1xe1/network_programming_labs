@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"net/rpc"
 
 	"github.com/andyp1xe1/network_programming_labs/packages/lab4/common"
@@ -24,7 +25,15 @@ func NewKVrpcClient(address string) (*KVrpcClient, error) {
 // Set implements store.Store.Set over RPC
 func (c *KVrpcClient) Set(ctx context.Context, key, value string) error {
 	id, _ := common.IDFromCtx(ctx)
-	return c.Call("KVrpc.Set", &SetArgs{ID: id, Key: key, Value: value}, &SetReply{})
+	version, hasVersion := common.VersionFromCtx(ctx)
+	if !hasVersion {
+		return fmt.Errorf("missing version in context for Set operation")
+	}
+
+	return c.Call(
+		"KVrpc.Set",
+		&SetArgs{ID: id, Key: key, Value: value, Version: version}, &SetReply{},
+	)
 }
 
 // Get implements store.Store.Get over RPC
@@ -40,7 +49,16 @@ func (c *KVrpcClient) Get(ctx context.Context, key string) (string, error) {
 // Delete implements store.Store.Delete over RPC
 func (c *KVrpcClient) Delete(ctx context.Context, key string) error {
 	id, _ := common.IDFromCtx(ctx)
-	return c.Call("KVrpc.Delete", &DeleteArgs{ID: id, Key: key}, &DeleteReply{})
+
+	version, hasVersion := common.VersionFromCtx(ctx)
+	if !hasVersion {
+		return fmt.Errorf("missing version in context for Delete operation")
+	}
+
+	return c.Call(
+		"KVrpc.Delete",
+		&DeleteArgs{ID: id, Key: key, Version: version}, &DeleteReply{},
+	)
 }
 
 // Exists implements store.Store.Exists over RPC

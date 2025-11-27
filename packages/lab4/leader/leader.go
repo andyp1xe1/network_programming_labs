@@ -8,6 +8,7 @@ package leader
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand/v2"
@@ -50,21 +51,33 @@ func (kvs *LeaderStore) Set(ctx context.Context, key, value string) error {
 		return err
 	}
 
+	vctx := common.CtxWithID(kvs.leaderID)
+	if vs, ok := kvs.Store.(*store.VStore); ok {
+		if meta, ok := vs.GetMeta(key); ok {
+			vctx = common.CtxWithVersion(vctx, meta.Version)
+		}
+	}
+
 	return kvs.replicateToFollowers(func(follower store.Store) error {
-		ctx := common.CtxWithID(kvs.leaderID)
-		return follower.Set(ctx, key, value)
+		return follower.Set(vctx, key, value)
 	})
 }
 
 func (kvs *LeaderStore) Delete(ctx context.Context, key string) error {
+	vctx := common.CtxWithID(kvs.leaderID)
+	if vs, ok := kvs.Store.(*store.VStore); ok {
+		if meta, ok := vs.GetMeta(key); ok {
+			vctx = common.CtxWithVersion(vctx, meta.Version)
+		}
+	}
+
 	if err := kvs.Store.Delete(ctx, key); err != nil {
 		log.Printf("LeaderStore: Delete failed locally for key=%s: %v", key, err)
 		return err
 	}
 
 	return kvs.replicateToFollowers(func(follower store.Store) error {
-		ctx := common.CtxWithID(kvs.leaderID)
-		return follower.Delete(ctx, key)
+		return follower.Delete(vctx, key)
 	})
 }
 
@@ -95,7 +108,7 @@ func (kvs *LeaderStore) replicateToFollowers(operation func(store.Store) error) 
 	kvs.configMu.RLock()
 	requiredConfirmations := min(kvs.config.CommitThreshold, len(kvs.followers))
 	kvs.configMu.RUnlock()
-	var errors []error
+	var errs []error
 	for i := 0; i < len(kvs.followers); i++ {
 		err := <-resultCh
 		if err == nil {
@@ -104,14 +117,16 @@ func (kvs *LeaderStore) replicateToFollowers(operation func(store.Store) error) 
 			if successCount >= requiredConfirmations {
 				return nil
 			}
-		} else {
+		} else if errors.Is(err, store.ErrorVersionConflict) {
 			log.Printf("Replication to follower failed: %v", err)
-			errors = append(errors, err)
+			errs = append(errs, err)
+		} else if errors.Is(err, store.ErrorGreaterVersionRequired) {
+			log.Printf("Replication to follower dropped: %v", err)
 		}
 	}
 	var err error
-	if len(errors) > 0 {
-		err = errors[0]
+	if len(errs) > 0 {
+		err = errs[0]
 	} else {
 		err = fmt.Errorf("unknown error during replication")
 	}
@@ -147,4 +162,12 @@ func (kvs *LeaderStore) GetCommitThreshold() int {
 // GetFollowerCount returns the number of configured followers
 func (kvs *LeaderStore) GetFollowerCount() int {
 	return len(kvs.followers)
+}
+
+// GetMeta returns the metadata for a key if the underlying store supports it
+func (kvs *LeaderStore) GetMeta(key string) (store.Metadata, bool) {
+	if metaStore, ok := kvs.Store.(store.MetadataStore); ok {
+		return metaStore.GetMeta(key)
+	}
+	return store.Metadata{}, false
 }
